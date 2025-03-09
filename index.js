@@ -9,6 +9,7 @@ const config = require('./config/config');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const hotelRoutes = require('./routes/hotelRoutes');
+const roomRoutes = require('./routes/roomRoutes')
 
 // Khởi tạo express
 const app = express();
@@ -28,6 +29,7 @@ app.use(cors({
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/hotels', hotelRoutes);
+app.use('/api/rooms', roomRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {
