@@ -6,23 +6,19 @@ const {
   respondToReview,
   deleteReview
 } = require('../controllers/reviewController');
-const { protect, authorize } = require('../middlewares/auth');
-
+const { protect } = require('../middlewares/auth');
+const { authorize } = require('../middlewares/roleCheck');
 const router = express.Router({ mergeParams: true });
 
 router.route('/')
-  .get(getHotelReviews)
   .post(protect, createReview);
+router.route('/:hotelId')
+  .get( getHotelReviews);
 
 router.route('/:id')
   .put(protect, updateReview)
   .delete(protect, deleteReview);
 
-router.put(
-  '/:id/respond',
-  protect,
-  authorize('hotel_owner', 'admin'),
-  respondToReview
-);
+router.patch('/:id/response', protect, authorize('hotel_owner', 'admin'), respondToReview);
 
 module.exports = router; 

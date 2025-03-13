@@ -33,8 +33,7 @@ const HotelSchema = new mongoose.Schema(
       trim: true 
     },
     ownerId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User',
+      type: String,
       required: [true, 'Vui lòng chọn chủ khách sạn']
     },
     amenities: [{ 

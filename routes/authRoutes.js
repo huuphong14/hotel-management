@@ -17,14 +17,14 @@ const router = express.Router();
 router.post('/register', register);
 router.post('/login', login);
 router.get('/me', protect, getMe);
-router.get('/logout', protect, logout);
+router.post('/logout', protect, logout);
 
 // Email verification
 router.get('/verify-email/:token', verifyEmail);
 
 // Password reset flow
-router.post('/forgot-password', sendOTP);
-router.post('/verify-otp', verifyOTP);
-router.post('/reset-password', resetPassword);
+router.post('/password/forgot', sendOTP);
+router.post('/password/verify-otp', verifyOTP);
+router.post('/password/reset', resetPassword);
 
 module.exports = router;

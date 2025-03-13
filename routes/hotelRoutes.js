@@ -6,6 +6,7 @@ const {
   updateHotel,
   deleteHotel
 } = require('../controllers/hotelController');
+const {getHotelReviews} = require('../controllers/reviewController')
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 

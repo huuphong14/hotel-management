@@ -24,10 +24,10 @@ router.use(protect);
 // User routes
 router.get('/me', getMe);
 router.put('/me', updateMe);
-router.put('/me/avatar', upload.single('avatar'), handleMulterError, uploadAvatar);
-router.put('/change-password', changePassword);
+router.patch('/me/avatar', upload.single('avatar'), handleMulterError, uploadAvatar);
+router.patch('/me/settings/password', changePassword);
+router.patch('/me/settings/notifications', updateNotificationSettings);
 router.delete('/me', deactivateAccount);
-router.put('/me/notifications', updateNotificationSettings);
 
 // Admin routes
 router.use(authorize('admin'));

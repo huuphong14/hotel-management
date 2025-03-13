@@ -6,12 +6,12 @@ const { authorize } = require('../middlewares/roleCheck');
 const router = express.Router();
 
 // Public routes - Không cần đăng nhập
-router.get('/hotel/:hotelId/rooms', getRooms); // Lấy danh sách phòng theo khách sạn
+router.get('/hotels/:hotelId/rooms', getRooms);
 router.get('/:id', getRoom); // Xem chi tiết một phòng
 
 // Protected routes - Cần đăng nhập và phân quyền
 router.use(protect);
-router.post('/hotel/:hotelId', authorize('hotel_owner'), createRoom);
+router.post('/hotels/:hotelId/rooms', authorize('hotel_owner'), createRoom);
 router.put('/:id', authorize('hotel_owner'), updateRoom);
 router.delete('/:id', authorize('hotel_owner'), deleteRoom);
 

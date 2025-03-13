@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
+const Booking = require('../models/Booking');
 
 // @desc    Tạo phòng mới cho khách sạn
 // @route   POST /api/hotels/:hotelId/rooms
@@ -136,55 +137,128 @@ exports.getRoom = async (req, res) => {
 };
 
 // @desc    Cập nhật thông tin phòng
-// @route   PUT /api/rooms/:roomId
+// @route   PUT /api/rooms/:id
 // @access  Private/Hotel Owner, Admin
 exports.updateRoom = async (req, res) => {
   try {
-    let room = await Room.findById(req.params.roomId);
+    let room = await Room.findById(req.params.id);
 
     if (!room) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Không tìm thấy phòng' 
+      });
     }
 
-    const hotel = await Hotel.findById(room.hotel);
+    const hotel = await Hotel.findById(room.hotelId);
 
-    // Kiểm tra quyền
-    if (hotel.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền cập nhật phòng này' });
+    if (!hotel) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Không tìm thấy thông tin khách sạn' 
+      });
     }
 
-    room = await Room.findByIdAndUpdate(req.params.roomId, req.body, { new: true, runValidators: true });
+    // Kiểm tra quyền (thêm role admin)
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Bạn không có quyền cập nhật phòng này' 
+      });
+    }
 
-    res.status(200).json({ success: true, data: room });
+    // Validate dữ liệu cập nhật
+    const allowedFields = ['name', 'type', 'price', 'capacity', 'description', 'amenities', 'images', 'isAvailable'];
+    const updateData = {};
+    Object.keys(req.body).forEach(key => {
+      if (allowedFields.includes(key)) {
+        updateData[key] = req.body[key];
+      }
+    });
+
+    room = await Room.findByIdAndUpdate(
+      req.params.id, 
+      updateData,
+      { 
+        new: true, 
+        runValidators: true 
+      }
+    ).populate({
+      path: 'hotelId',
+      select: 'name address'
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      message: 'Cập nhật phòng thành công',
+      data: room 
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Lỗi server' });
+    console.error('Chi tiết lỗi:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Lỗi server',
+      error: error.message 
+    });
   }
 };
 
 // @desc    Xóa phòng
-// @route   DELETE /api/rooms/:roomId
+// @route   DELETE /api/rooms/:id
 // @access  Private/Hotel Owner, Admin
 exports.deleteRoom = async (req, res) => {
   try {
-    const room = await Room.findById(req.params.roomId);
+    const room = await Room.findById(req.params.id);
 
     if (!room) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng' });
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Không tìm thấy phòng' 
+      });
     }
 
-    const hotel = await Hotel.findById(room.hotel);
+    const hotel = await Hotel.findById(room.hotelId);
+
+    if (!hotel) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Không tìm thấy thông tin khách sạn' 
+      });
+    }
 
     // Kiểm tra quyền
-    if (hotel.owner.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa phòng này' });
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Bạn không có quyền xóa phòng này' 
+      });
+    }
+
+    // Kiểm tra xem phòng có đang được đặt không
+    const hasActiveBookings = await Booking.exists({
+      roomId: room._id,
+      status: { $in: ['pending', 'confirmed'] }
+    });
+
+    if (hasActiveBookings) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể xóa phòng đang có đơn đặt phòng'
+      });
     }
 
     await room.deleteOne();
 
-    res.status(200).json({ success: true, message: 'Phòng đã được xóa' });
+    res.status(200).json({ 
+      success: true, 
+      message: 'Xóa phòng thành công' 
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Lỗi server' });
+    console.error('Chi tiết lỗi:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Lỗi server',
+      error: error.message 
+    });
   }
 };

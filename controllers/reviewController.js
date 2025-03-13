@@ -1,4 +1,5 @@
 const Review = require('../models/Review');
+const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
 const Booking = require('../models/Booking');
 
@@ -7,77 +8,75 @@ const Booking = require('../models/Booking');
 // @access  Private
 exports.createReview = async (req, res) => {
   try {
-    const { hotelId, rating, title, comment, isAnonymous } = req.body;
-
-    // Kiểm tra xem khách sạn có tồn tại không
-    const hotel = await Hotel.findById(hotelId);
-    if (!hotel) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy khách sạn'
-      });
+    const { roomId, rating, title, comment, isAnonymous } = req.body;
+    
+    // Kiểm tra xem phòng có tồn tại không và lấy hotelId từ phòng
+    const room = await Room.findById(roomId);
+    if (!room) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy phòng' });
     }
-
+    
+    // Lấy hotelId từ thông tin phòng
+    const hotelId = room.hotelId;
+    
     // Kiểm tra xem user đã từng đặt phòng ở khách sạn này chưa
     const hasBooking = await Booking.findOne({
       userId: req.user.id,
-      'room.hotelId': hotelId,
+      roomId: roomId,
       status: 'completed'
     });
-
+    
     if (!hasBooking) {
       return res.status(400).json({
         success: false,
         message: 'Bạn cần phải đặt phòng và hoàn thành lưu trú trước khi đánh giá'
       });
     }
-
+    
     // Kiểm tra xem user đã đánh giá khách sạn này chưa
-    const existingReview = await Review.findOne({
-      userId: req.user.id,
-      hotelId
-    });
-
+    const existingReview = await Review.findOne({ userId: req.user.id, hotelId });
     if (existingReview) {
       return res.status(400).json({
         success: false,
         message: 'Bạn đã đánh giá khách sạn này rồi'
       });
     }
-
+    
     // Tạo đánh giá mới
     const review = await Review.create({
       userId: req.user.id,
       hotelId,
+      roomId,
       rating,
       title,
       comment,
       isAnonymous
     });
-
+    
     // Populate thông tin user (trừ khi anonymous)
-    await review.populate({
-      path: 'userId',
-      select: 'name'
-    });
-
-    res.status(201).json({
-      success: true,
-      data: review
-    });
+    await review.populate({ path: 'userId', select: 'name' });
+    
+    res.status(201).json({ success: true, data: review });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Lỗi server'
-    });
+    res.status(500).json({ success: false, message: error.message || 'Lỗi server' });
   }
 };
 
 // @desc    Lấy tất cả đánh giá của một khách sạn
-// @route   GET /api/hotels/:hotelId/reviews
+// @route   GET /api/reviews/:hotelId
 // @access  Public
 exports.getHotelReviews = async (req, res) => {
   try {
+    console.log(`Fetching reviews for hotelId: ${req.params.hotelId}`);
+
+    if (!req.params.hotelId) {
+      console.error("Error: Missing hotelId in request params");
+      return res.status(400).json({
+        success: false,
+        message: "Thiếu hotelId trong yêu cầu"
+      });
+    }
+
     const reviews = await Review.find({ hotelId: req.params.hotelId })
       .populate({
         path: 'userId',
@@ -85,18 +84,27 @@ exports.getHotelReviews = async (req, res) => {
       })
       .sort('-createdAt');
 
+    if (reviews.length === 0) {
+      console.warn(`No reviews found for hotelId: ${req.params.hotelId}`);
+    }
+
+    console.log(`Found ${reviews.length} reviews for hotelId: ${req.params.hotelId}`);
+
     res.status(200).json({
       success: true,
       count: reviews.length,
       data: reviews
     });
   } catch (error) {
+    console.error(`Error fetching reviews for hotelId: ${req.params.hotelId}`, error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server',
+      error: error.message
     });
   }
 };
+
 
 // @desc    Cập nhật đánh giá
 // @route   PUT /api/reviews/:id
