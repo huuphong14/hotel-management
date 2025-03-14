@@ -4,6 +4,7 @@ const { sendTokenResponse } = require('../utils/tokenUtils');
 const sendEmail = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
+const passport = require('passport');
 
 // Generate OTP
 const generateOTP = () => {
@@ -351,6 +352,78 @@ exports.resetPassword = async (req, res) => {
       success: true,
       message: 'Đặt lại mật khẩu thành công'
     });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server'
+    });
+  }
+};
+
+// @desc    Đăng nhập bằng Google
+// @route   GET /api/auth/google
+// @access  Public
+exports.googleAuth = passport.authenticate('google', {
+  scope: ['profile', 'email']
+});
+
+// @desc    Callback sau khi đăng nhập Google
+// @route   GET /api/auth/google/callback
+// @access  Public
+exports.googleCallback = async (req, res) => {
+  try {
+    const { user } = req;
+    
+    // Kiểm tra xem user đã tồn tại chưa
+    let existingUser = await User.findOne({ email: user.email });
+    
+    if (!existingUser) {
+      // Tạo user mới nếu chưa tồn tại
+      existingUser = await User.create({
+        name: user.displayName,
+        email: user.email,
+        password: crypto.randomBytes(20).toString('hex'), // Tạo mật khẩu ngẫu nhiên
+        isEmailVerified: true,
+        provider: 'google'
+      });
+    }
+
+    sendTokenResponse(existingUser, 200, res);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server'
+    });
+  }
+};
+
+// @desc    Đăng nhập bằng Facebook
+// @route   GET /api/auth/facebook
+// @access  Public
+exports.facebookAuth = passport.authenticate('facebook', {
+  scope: ['email']
+});
+
+// @desc    Callback sau khi đăng nhập Facebook
+// @route   GET /api/auth/facebook/callback
+// @access  Public
+exports.facebookCallback = async (req, res) => {
+  try {
+    const { user } = req;
+    
+    let existingUser = await User.findOne({ email: user.email });
+    
+    if (!existingUser) {
+      existingUser = await User.create({
+        name: user.displayName,
+        email: user.email,
+        password: crypto.randomBytes(20).toString('hex'),
+        isEmailVerified: true,
+        provider: 'facebook'
+      });
+    }
+
+    sendTokenResponse(existingUser, 200, res);
   } catch (error) {
     res.status(500).json({
       success: false,

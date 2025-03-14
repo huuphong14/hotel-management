@@ -4,6 +4,8 @@ const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const connectDB = require('./config/db');
 const config = require('./config/config');
+const passport = require('passport');
+const session = require('express-session');
 
 // Load các routes
 const authRoutes = require('./routes/authRoutes');
@@ -27,6 +29,24 @@ app.use(cors({
   origin: config.clientUrl,
   credentials: true
 }));
+
+// Cấu hình session
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000
+  }
+}));
+
+// Khởi tạo passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Import cấu hình passport
+require('./config/passport');
 
 // Routes
 app.use('/api/auth', authRoutes);

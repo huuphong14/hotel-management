@@ -7,9 +7,14 @@ const {
   verifyEmail,
   sendOTP,
   verifyOTP,
-  resetPassword
+  resetPassword,
+  googleAuth,
+  googleCallback,
+  facebookAuth,
+  facebookCallback
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/auth');
+const passport = require('passport');
 
 const router = express.Router();
 
@@ -26,5 +31,13 @@ router.get('/verify-email/:token', verifyEmail);
 router.post('/password/forgot', sendOTP);
 router.post('/password/verify-otp', verifyOTP);
 router.post('/password/reset', resetPassword);
+
+// Google OAuth routes
+router.get('/google', googleAuth);
+router.get('/google/callback', passport.authenticate('google'), googleCallback);
+
+// Facebook OAuth routes  
+router.get('/facebook', facebookAuth);
+router.get('/facebook/callback', passport.authenticate('facebook'), facebookCallback);
 
 module.exports = router;
