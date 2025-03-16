@@ -15,6 +15,7 @@ const roomRoutes = require('./routes/roomRoutes')
 const postRoutes = require('./routes/postRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 
 // Khởi tạo express
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
+app.use('/api/chats', chatRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {
