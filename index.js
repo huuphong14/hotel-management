@@ -6,6 +6,8 @@ const connectDB = require('./config/db');
 const config = require('./config/config');
 const passport = require('passport');
 const session = require('express-session');
+const http = require('http');
+const socketIO = require('./utils/socket');
 
 // Load các routes
 const authRoutes = require('./routes/authRoutes');
@@ -16,9 +18,11 @@ const postRoutes = require('./routes/postRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const chatRoutes = require('./routes/chatRoutes');
+const voucherRoutes = require('./routes/voucherRoutes');
 
 // Khởi tạo express
 const app = express();
+const server = http.createServer(app);
 
 // Kết nối đến database
 connectDB();
@@ -49,6 +53,9 @@ app.use(passport.session());
 // Import cấu hình passport
 require('./config/passport');
 
+// Khởi tạo Socket.IO
+socketIO.init(server);
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -58,6 +65,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/vouchers', voucherRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {
@@ -74,6 +82,6 @@ app.use((req, res) => {
 
 // Khởi động server
 const PORT = config.port;
-app.listen(PORT, () => {
-  console.log(`Server đang chạy ở cổng ${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

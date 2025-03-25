@@ -38,11 +38,13 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: {
-      values: ['user', 'hotel_owner', 'admin'],
-      message: 'Quyền không hợp lệ'
-    },
+    enum: ['user', 'partner', 'admin'],
     default: 'user'
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'active', 'rejected'],
+    default: 'active' // mặc định active cho user thường, pending cho partner
   },
   isEmailVerified: {
     type: Boolean,
@@ -55,8 +57,27 @@ const UserSchema = new mongoose.Schema({
     zipCode: String,
     country: String
   },
+  resetPasswordToken: {
+    type: String
+  },
+  resetPasswordExpire: {
+    type: Date
+  },  
+  refreshToken: {
+    type: String,
+    select: false
+  },
   verificationToken: String,
-  verificationTokenExpire: Date
+  verificationTokenExpire: Date,
+  partnerInfo: {
+    businessName: String,
+    businessAddress: String,
+    taxCode: String,
+    phoneNumber: String,
+    description: String,
+    documents: [String], // URL của các giấy tờ
+    rejectionReason: String // Lý do từ chối nếu có
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

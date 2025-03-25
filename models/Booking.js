@@ -1,37 +1,43 @@
 const mongoose = require('mongoose');
 
-const BookingSchema = new mongoose.Schema({
-  userId: {
+const bookingSchema = new mongoose.Schema({
+  user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: [true, 'Vui lòng chọn khách hàng']
+    required: true
   },
-  roomId: {
+  room: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Room',
-    required: [true, 'Vui lòng chọn phòng']
+    required: true
   },
-  checkInDate: {
+  checkIn: {
     type: Date,
-    required: [true, 'Vui lòng chọn ngày nhận phòng']
+    required: true
   },
-  checkOutDate: {
+  checkOut: {
     type: Date,
-    required: [true, 'Vui lòng chọn ngày trả phòng']
+    required: true
   },
-  totalPrice: {
+  voucher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Voucher'
+  },
+  originalPrice: {
     type: Number,
-    required: [true, 'Vui lòng nhập tổng giá tiền'],
-    min: [0, 'Tổng giá tiền không thể âm']
+    required: true
+  },
+  discountAmount: {
+    type: Number,
+    default: 0
+  },
+  finalPrice: {
+    type: Number,
+    required: true
   },
   status: {
     type: String,
-    enum: ['pending', 'confirmed', 'cancelled', 'checked-in', 'completed', 'no-show'],
-    default: 'pending'
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'paid', 'failed'],
+    enum: ['pending', 'confirmed', 'cancelled', 'completed'],
     default: 'pending'
   }
 }, {
@@ -39,16 +45,16 @@ const BookingSchema = new mongoose.Schema({
 });
 
 // Tạo index cho tìm kiếm
-BookingSchema.index({ userId: 1, status: 1 });
-BookingSchema.index({ roomId: 1, checkInDate: 1, checkOutDate: 1 });
+bookingSchema.index({ user: 1, status: 1 });
+bookingSchema.index({ room: 1, checkIn: 1, checkOut: 1 });
 
 // Middleware để kiểm tra ngày
-BookingSchema.pre('save', function(next) {
+bookingSchema.pre('save', function(next) {
   // Kiểm tra ngày check-out phải sau ngày check-in
-  if (this.checkOutDate <= this.checkInDate) {
+  if (this.checkOut <= this.checkIn) {
     next(new Error('Ngày trả phòng phải sau ngày nhận phòng'));
   }
   next();
 });
 
-module.exports = mongoose.model('Booking', BookingSchema); 
+module.exports = mongoose.model('Booking', bookingSchema); 

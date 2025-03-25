@@ -1,6 +1,7 @@
 const Chat = require('../models/Chat');
 const User = require('../models/User');
 const mongoose = require('mongoose');
+const socketIO = require('../utils/socket');
 
 // @desc    Gửi tin nhắn
 // @route   POST /api/chats
@@ -24,6 +25,12 @@ exports.sendMessage = async (req, res) => {
       receiverId,
       message
     });
+
+    // Populate thông tin người gửi
+    await chat.populate('senderId', 'name');
+
+    // Gửi tin nhắn realtime
+    socketIO.sendToUser(receiverId, 'newMessage', chat);
 
     res.status(201).json({
       success: true,
@@ -190,6 +197,9 @@ exports.markAsRead = async (req, res) => {
 
     chat.status = 'read';
     await chat.save();
+
+    // Thông báo realtime cho người gửi
+    socketIO.sendToUser(chat.senderId.toString(), 'messageRead', { chatId: chat._id });
 
     res.status(200).json({
       success: true,

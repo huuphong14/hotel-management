@@ -3,20 +3,27 @@ const {
   createBooking,
   getMyBookings,
   cancelBooking,
-  updateBookingStatus
+  updateBookingStatus,
+  checkVoucher
 } = require('../controllers/bookingController');
 const { protect} = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 
 const router = express.Router();
 
-router.use(protect); // Tất cả routes đều yêu cầu đăng nhập
+router.use(protect);
 
-router.route('/')
-  .post(createBooking)
-  .get(getMyBookings);
+// User routes
+router.post('/check-voucher', checkVoucher);
+router.post('/', createBooking);
+router.get('/my-bookings', getMyBookings);
+router.patch('/:id/cancel', cancelBooking);
 
-router.patch('/:id/status/cancel', cancelBooking);
-router.patch('/:id/status/update', authorize('admin', 'hotel_owner'), updateBookingStatus);
+// Admin/Partner routes
+router.patch(
+  '/:id/status',
+  authorize('admin', 'partner'),
+  updateBookingStatus
+);
 
 module.exports = router; 
