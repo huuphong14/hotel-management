@@ -12,6 +12,7 @@ module.exports = {
   emailUsername: process.env.EMAIL_USERNAME,
   emailPassword: process.env.EMAIL_PASSWORD,
   emailFrom: process.env.EMAIL_FROM,
+  serverUrl: process.env.SERVER_URL,
   clientUrl: process.env.CLIENT_URL,
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,

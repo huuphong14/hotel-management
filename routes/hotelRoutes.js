@@ -6,7 +6,6 @@ const {
   updateHotel,
   deleteHotel
 } = require('../controllers/hotelController');
-const {getHotelReviews} = require('../controllers/reviewController')
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 
@@ -18,8 +17,8 @@ router.get('/:id', getHotel);
 
 // Protected routes
 router.use(protect);
-router.post('/', authorize('hotel_owner'), createHotel);
-router.put('/:id', authorize('hotel_owner'), updateHotel);
-router.delete('/:id', authorize('hotel_owner'), deleteHotel);
+router.post('/', authorize('partner'), createHotel);
+router.put('/:id', authorize('partner'), updateHotel);
+router.delete('/:id', authorize('partner'), deleteHotel);
 
 module.exports = router;

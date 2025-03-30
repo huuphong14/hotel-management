@@ -1,18 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const paymentService = require('../services/paymentService');
+const bookingController = require('../controllers/bookingController');
 
-// ZaloPay callback
-router.post('/zalopay-callback', async (req, res) => {
-  try {
-    const result = await paymentService.handleZaloPayCallback(req.body);
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message
-    });
-  }
-});
+router.get('/payment-status/:transactionId', bookingController.checkPaymentStatus);
+router.post('/zalopay/webhook', bookingController.zaloPayWebhook);
 
-module.exports = router; 
+module.exports = router;

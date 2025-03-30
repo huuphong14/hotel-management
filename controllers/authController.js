@@ -1,11 +1,14 @@
 const User = require('../models/User');
+const Hotel = require('../models/Hotel');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { sendTokenResponse } = require('../utils/tokenUtils');
 const sendEmail = require('../utils/sendEmail');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 const passport = require('passport');
-const NotificationService = require('../services/notificationService');
+const asyncHandler = require('../middlewares/asyncHandler');
 
 // Generate OTP
 const generateOTP = () => {
@@ -466,77 +469,163 @@ exports.facebookCallback = async (req, res) => {
   }
 };
 
-// @desc    Đăng ký tài khoản đối tác
-// @route   POST /api/auth/register-partner
+// @desc    Đăng ký đối tác và tạo khách sạn
+// @route   POST /api/users/register-partner
 // @access  Public
-exports.registerPartner = async (req, res) => {
+exports.registerPartner = asyncHandler(async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const {
-      name,
-      email,
-      password,
-      businessName,
-      businessAddress,
-      taxCode,
-      phoneNumber,
-      description,
-      documents
+    const { 
+      // Thông tin người dùng
+      name, 
+      email, 
+      phone,
+      
+      // Thông tin khách sạn
+      hotelName, 
+      hotelAddress, 
+      hotelDescription,
+      hotelLocationName,
+      hotelLocationDescription,
+      hotelCoordinates, 
+      hotelAmenities,
+      hotelWebsite,
+      hotelFeaturedImage,
+      hotelImages,
+      
+      // Chính sách khách sạn
+      checkInTime,
+      checkOutTime,
+      cancellationPolicy,
+      childrenPolicy,
+      petPolicy,
+      smokingPolicy 
     } = req.body;
 
-    // Kiểm tra email đã tồn tại
-    let user = await User.findOne({ email });
-    if (user) {
+    // Kiểm tra các trường bắt buộc
+    if (!name || !email || !phone || !hotelName || !hotelAddress || !hotelCoordinates || !hotelDescription || !hotelLocationName) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({
         success: false,
-        message: 'Email đã được đăng ký'
+        message: 'Vui lòng cung cấp đầy đủ thông tin người dùng và khách sạn'
       });
     }
 
-    // Tạo user mới với role partner và status pending
-    user = await User.create({
+    // Kiểm tra xem email đã tồn tại chưa
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: 'Email đã được sử dụng'
+      });
+    }
+
+    // Tạo người dùng mới với vai trò 'partner'
+    // Password sẽ được tạo ngẫu nhiên khi admin duyệt
+    const user = await User.create([{
       name,
       email,
-      password,
+      phone,
+      password: crypto.randomBytes(10).toString('hex'), // Mật khẩu tạm thời ngẫu nhiên
       role: 'partner',
-      status: 'pending',
-      partnerInfo: {
-        businessName,
-        businessAddress,
-        taxCode,
-        phoneNumber,
-        description,
-        documents
-      }
-    });
+      status: 'pending', // Trạng thái chờ duyệt cho đối tác
+      isEmailVerified: false
+    }], { session });
 
-    // Gửi thông báo cho admin
-    const admins = await User.find({ role: 'admin' });
-    await NotificationService.createPartnerRegistrationNotification(user, admins.map(admin => admin._id));
+    const newUser = user[0];
 
-    // Gửi email thông báo
+    // Tạo khách sạn mới với ownerId là ID của người dùng vừa tạo
+    const hotel = await Hotel.create([{
+      name: hotelName,
+      address: hotelAddress,
+      description: hotelDescription,
+      locationName: hotelLocationName,
+      locationDescription: hotelLocationDescription,
+      location: {
+        type: 'Point',
+        coordinates: hotelCoordinates // [longitude, latitude]
+      },
+      ownerId: newUser._id,
+      website: hotelWebsite,
+      featuredImage: hotelFeaturedImage,
+      images: hotelImages || [],
+      amenities: hotelAmenities || [],
+      policies: {
+        checkInTime: checkInTime || "14:00",
+        checkOutTime: checkOutTime || "12:00",
+        cancellationPolicy: cancellationPolicy || "no-refund",
+        childrenPolicy: childrenPolicy || "",
+        petPolicy: petPolicy || "",
+        smokingPolicy: smokingPolicy || ""
+      },
+      status: 'pending' // Trạng thái chờ duyệt
+    }], { session });
+
+    // Tạo token xác thực email
+    const verificationToken = newUser.getVerificationToken();
+    await newUser.save({ session, validateBeforeSave: false });
+    
+    // Tạo URL xác thực
+    const verificationUrl = `${config.clientUrl}/verify-email/${verificationToken}`;
+
+    // Nội dung email
     const message = `
-      <h1>Đăng ký tài khoản đối tác</h1>
-      <p>Cảm ơn bạn đã đăng ký làm đối tác với chúng tôi.</p>
-      <p>Chúng tôi sẽ xem xét hồ sơ của bạn và phản hồi trong thời gian sớm nhất.</p>
+      <h1>Xác nhận đăng ký tài khoản đối tác</h1>
+      <p>Cảm ơn bạn đã đăng ký tài khoản đối tác tại hệ thống của chúng tôi.</p>
+      <p>Vui lòng nhấn vào đường dẫn sau để xác nhận email của bạn:</p>
+      <a href="${verificationUrl}" target="_blank">Xác nhận email</a>
+      <p>Đường dẫn có hiệu lực trong 24 giờ.</p>
+      <p>Sau khi được phê duyệt, bạn sẽ nhận được email thông báo kèm theo thông tin đăng nhập.</p>
     `;
+    
+    try {
+      await sendEmail({
+        email: newUser.email,
+        subject: 'Xác thực email đối tác',
+        message
+      });
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể gửi email xác thực. Vui lòng thử lại sau'
+      });
+    }
 
-    await sendEmail({
-      email: user.email,
-      subject: 'Đăng ký tài khoản đối tác',
-      message
-    });
+    // Commit giao dịch nếu mọi thứ thành công
+    await session.commitTransaction();
+    session.endSession();
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: 'Đăng ký thành công, vui lòng chờ admin phê duyệt'
+      data: {
+        user: {
+          id: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+          role: newUser.role,
+          status: newUser.status
+        },
+        hotel: hotel[0]
+      },
+      message: 'Đăng ký đối tác và khách sạn thành công. Vui lòng kiểm tra email để xác thực.'
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server khi đăng ký đối tác và khách sạn'
     });
   }
-};
+});
 
 // @desc    Phê duyệt tài khoản đối tác
 // @route   PUT /api/auth/approve-partner/:id
@@ -559,17 +648,30 @@ exports.approvePartner = async (req, res) => {
       });
     }
 
+    // Tạo mật khẩu ngẫu nhiên
+    const plainPassword = crypto.randomBytes(6).toString('hex');
+    
+    // Hash mật khẩu và cập nhật trạng thái người dùng
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(plainPassword, salt);
     user.status = 'active';
     await user.save();
 
-    // Gửi thông báo cho đối tác
-    await NotificationService.createPartnerApprovalNotification(user);
+    // Cập nhật trạng thái khách sạn
+    const hotel = await Hotel.findOne({ ownerId: user._id });
+    if (hotel) {
+      hotel.status = 'active';
+      await hotel.save();
+    }
 
-    // Gửi email thông báo
+    // Gửi email thông báo kèm thông tin đăng nhập
     const message = `
       <h1>Tài khoản đối tác đã được phê duyệt</h1>
-      <p>Chúc mừng! Tài khoản đối tác của bạn đã được phê duyệt.</p>
-      <p>Bạn có thể đăng nhập và bắt đầu sử dụng các tính năng dành cho đối tác.</p>
+      <p>Chúc mừng! Tài khoản đối tác và khách sạn của bạn đã được phê duyệt.</p>
+      <p>Bạn có thể đăng nhập và bắt đầu sử dụng các tính năng dành cho đối tác với thông tin sau:</p>
+      <p><strong>Email:</strong> ${user.email}</p>
+      <p><strong>Mật khẩu:</strong> ${plainPassword}</p>
+      <p>Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu để đảm bảo an toàn.</p>
     `;
 
     await sendEmail({
@@ -580,9 +682,23 @@ exports.approvePartner = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      message: 'Đã phê duyệt tài khoản đối tác và gửi thông tin đăng nhập',
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          status: user.status
+        },
+        hotel: hotel ? {
+          _id: hotel._id,
+          name: hotel.name,
+          status: hotel.status
+        } : null
+      }
     });
   } catch (error) {
+    console.error('Lỗi phê duyệt đối tác:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server'
@@ -596,6 +712,14 @@ exports.approvePartner = async (req, res) => {
 exports.rejectPartner = async (req, res) => {
   try {
     const { reason } = req.body;
+    
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp lý do từ chối'
+      });
+    }
+    
     const user = await User.findById(req.params.id);
 
     if (!user) {
@@ -605,18 +729,28 @@ exports.rejectPartner = async (req, res) => {
       });
     }
 
+    if (user.role !== 'partner') {
+      return res.status(400).json({
+        success: false,
+        message: 'Người dùng không phải là đối tác'
+      });
+    }
+
     user.status = 'rejected';
-    user.partnerInfo.rejectionReason = reason;
     await user.save();
 
-    // Gửi thông báo cho đối tác
-    await NotificationService.createPartnerRejectionNotification(user, reason);
+    // Cập nhật trạng thái khách sạn
+    const hotel = await Hotel.findOne({ ownerId: user._id });
+    if (hotel) {
+      hotel.status = 'inactive';
+      await hotel.save();
+    }
 
     // Gửi email thông báo
     const message = `
       <h1>Tài khoản đối tác không được phê duyệt</h1>
       <p>Rất tiếc! Tài khoản đối tác của bạn chưa được phê duyệt.</p>
-      <p>Lý do: ${reason}</p>
+      <p><strong>Lý do:</strong> ${reason}</p>
       <p>Bạn có thể cập nhật thông tin và gửi lại yêu cầu.</p>
     `;
 
@@ -628,9 +762,18 @@ exports.rejectPartner = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: user
+      message: 'Đã từ chối tài khoản đối tác',
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          status: user.status
+        }
+      }
     });
   } catch (error) {
+    console.error('Lỗi từ chối đối tác:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server'
@@ -646,13 +789,30 @@ exports.getPendingPartners = async (req, res) => {
     const partners = await User.find({
       role: 'partner',
       status: 'pending'
-    });
+    }).select('-password -refreshToken');
+
+    // Lấy thông tin khách sạn tương ứng với mỗi đối tác
+    const partnersWithHotels = await Promise.all(
+      partners.map(async (partner) => {
+        const hotel = await Hotel.findOne({ 
+          ownerId: partner._id,
+          status: 'pending'
+        }).populate('amenities');
+        
+        return {
+          user: partner,
+          hotel: hotel || null
+        };
+      })
+    );
 
     res.status(200).json({
       success: true,
-      data: partners
+      count: partnersWithHotels.length,
+      data: partnersWithHotels
     });
   } catch (error) {
+    console.error('Lỗi lấy danh sách đối tác chờ duyệt:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server'

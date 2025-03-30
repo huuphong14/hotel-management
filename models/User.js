@@ -68,16 +68,7 @@ const UserSchema = new mongoose.Schema({
     select: false
   },
   verificationToken: String,
-  verificationTokenExpire: Date,
-  partnerInfo: {
-    businessName: String,
-    businessAddress: String,
-    taxCode: String,
-    phoneNumber: String,
-    description: String,
-    documents: [String], // URL của các giấy tờ
-    rejectionReason: String // Lý do từ chối nếu có
-  }
+  verificationTokenExpire: Date
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -128,15 +119,6 @@ UserSchema.pre('save', async function(next) {
 // So sánh password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
-};
-
-// Tạo JWT token
-UserSchema.methods.getSignedJwtToken = function() {
-  return jwt.sign(
-    { id: this._id, role: this.role },
-    process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRE }
-  );
 };
 
 // Tạo Access Token

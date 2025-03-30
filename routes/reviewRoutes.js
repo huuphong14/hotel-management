@@ -19,6 +19,6 @@ router.route('/:id')
   .put(protect, updateReview)
   .delete(protect, deleteReview);
 
-router.patch('/:id/response', protect, authorize('hotel_owner', 'admin'), respondToReview);
+router.patch('/:id/response', protect, authorize('partner', 'admin'), respondToReview);
 
 module.exports = router; 

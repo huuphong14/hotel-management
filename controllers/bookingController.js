@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Voucher = require('../models/Voucher');
 const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
+const ZaloPayService = require('../services/zaloPayService')
 
 // @desc    Tạo booking mới
 // @route   POST /api/bookings
@@ -134,10 +135,14 @@ exports.createBooking = async (req, res) => {
       message
     });
 
+    const paymentUrl = await ZaloPayService.createPaymentUrl(booking);
+    console.log("Payment URL generated:", paymentUrl);
+
     console.log("Booking created successfully:", booking._id);
     res.status(201).json({
       success: true,
-      data: booking
+      data: booking,
+      paymentUrl: paymentUrl.payUrl
     });
   } catch (error) {
     console.error("Error creating booking:", error);
@@ -147,6 +152,33 @@ exports.createBooking = async (req, res) => {
     });
   }
 };
+
+// Phương thức xác nhận thanh toán
+exports.confirmPayment = async (req, res) => {
+  try {
+    const paymentData = req.body;
+    const result = await ZaloPayService.verifyPayment(paymentData);
+
+    if (result) {
+      res.status(200).json({
+        success: true,
+        message: 'Thanh toán thành công'
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: 'Thanh toán không thành công'
+      });
+    }
+  } catch (error) {
+    console.error("Payment confirmation error:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi xác nhận thanh toán'
+    });
+  }
+};
+
 
 // @desc    Lấy danh sách booking của user
 // @route   GET /api/bookings
@@ -172,53 +204,7 @@ exports.getMyBookings = async (req, res) => {
 // @desc    Hủy booking
 // @route   PUT /api/bookings/:id/cancel
 // @access  Private
-exports.cancelBooking = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
 
-    if (!booking) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy booking'
-      });
-    }
-
-    // Kiểm tra quyền hủy booking
-    if (booking.userId.toString() !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Không có quyền hủy booking này'
-      });
-    }
-
-    // Kiểm tra trạng thái booking có thể hủy
-    if (!['pending', 'confirmed'].includes(booking.status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Không thể hủy booking này'
-      });
-    }
-
-    // Cập nhật trạng thái booking
-    booking.status = 'cancelled';
-    await booking.save();
-
-    // Cập nhật trạng thái phòng
-    const room = await Room.findById(booking.roomId);
-    room.status = 'available';
-    await room.save();
-
-    res.status(200).json({
-      success: true,
-      data: booking
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server'
-    });
-  }
-};
 
 // @desc    Cập nhật trạng thái booking
 // @route   PUT /api/bookings/:id/status
@@ -350,3 +336,117 @@ async function checkRoomAvailability(roomId, checkIn, checkOut) {
 
   return !existingBooking;
 } 
+
+// Kiểm tra trạng thái thanh toán
+exports.checkPaymentStatus = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    const paymentStatus = await ZaloPayService.verifyPayment(transactionId);
+    res.json(paymentStatus);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Xử lý callback từ ZaloPay
+// @route   POST /api/bookings/zalopay-callback
+// @access  Public
+exports.zaloPayCallback = async (req, res) => {
+  try {
+    console.log("Received ZaloPay callback:", req.body);
+    await ZaloPayService.handleCallback(req, res);
+  } catch (error) {
+    console.error("ZaloPay callback processing error:", error);
+    res.status(500).json({
+      return_code: -1,
+      return_message: 'Lỗi xử lý callback'
+    });
+  }
+};
+
+// @desc    Xử lý khi người dùng quay lại từ ZaloPay
+// @route   GET /api/bookings/zalopay-return
+// @access  Public
+exports.zaloPayReturn = async (req, res) => {
+  try {
+    console.log("User returned from ZaloPay payment:", req.query);
+    await ZaloPayService.handleRedirect(req, res);
+  } catch (error) {
+    console.error("ZaloPay return processing error:", error);
+    res.redirect('/payment-error');
+  }
+};
+
+// Cập nhật phương thức cancelBooking để sử dụng các tính năng mới
+exports.cancelBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy booking'
+      });
+    }
+
+    // Kiểm tra quyền hủy booking
+    if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Không có quyền hủy booking này'
+      });
+    }
+
+    // Kiểm tra trạng thái booking có thể hủy
+    if (!['confirmed', 'pending'].includes(booking.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể hủy booking này'
+      });
+    }
+
+    // Kiểm tra nếu đã thanh toán thì thực hiện hoàn tiền
+    if (booking.paymentStatus === 'paid') {
+      console.log("Processing refund for booking:", booking._id);
+      const refundResult = await ZaloPayService.refundPayment(booking);
+
+      if (!refundResult) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không thể hoàn tiền'
+        });
+      }
+      
+      // ZaloPayService.refundPayment đã cập nhật trạng thái booking
+      res.status(200).json({
+        success: true,
+        message: 'Hủy booking và hoàn tiền thành công'
+      });
+    } else {
+      // Nếu chưa thanh toán, chỉ cần cập nhật trạng thái
+      booking.status = 'cancelled';
+      await booking.save();
+      
+      // Gửi thông báo hủy
+      await NotificationService.createNotification({
+        user: booking.user,
+        title: 'Đặt phòng đã hủy',
+        message: `Đơn đặt phòng #${booking._id} đã được hủy thành công`,
+        type: 'booking',
+        relatedModel: 'Booking',
+        relatedId: booking._id
+      });
+      
+      res.status(200).json({
+        success: true,
+        message: 'Hủy booking thành công'
+      });
+    }
+  } catch (error) {
+    console.error("Booking cancellation error:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server'
+    });
+  }
+};

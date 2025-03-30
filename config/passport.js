@@ -22,7 +22,7 @@ passport.use(
     {
       clientID: config.google.clientId,
       clientSecret: config.google.clientSecret,
-      callbackURL: `${config.clientUrl}/api/auth/google/callback`,
+      callbackURL: `${config.serverUrl}/api/auth/google/callback`,
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
@@ -49,7 +49,7 @@ passport.use(
     {
       clientID: config.facebook.clientId,
       clientSecret: config.facebook.clientSecret,
-      callbackURL: `${config.clientUrl}/api/auth/facebook/callback`,
+      callbackURL: `${config.serverUrl}/api/auth/facebook/callback`,
       profileFields: ['id', 'displayName', 'email'],
     },
     async (accessToken, refreshToken, profile, done) => {

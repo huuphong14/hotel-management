@@ -5,7 +5,8 @@ const config = require('../config/config');
 const sendTokenResponse = async (user, statusCode, res) => {
   const accessToken = user.getAccessToken();
   const refreshToken = user.getRefreshToken();
-
+  console.log('Access Token:', accessToken);
+  console.log('Refresh Token:', refreshToken);
   // Lưu refresh token vào DB
   user.refreshToken = refreshToken;
   await user.save({ validateBeforeSave: false });

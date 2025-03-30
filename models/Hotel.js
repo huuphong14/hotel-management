@@ -11,6 +11,14 @@ const HotelSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Vui lòng nhập địa chỉ']
     },
+    locationName: { 
+      type: String,
+      required: [true, 'Vui lòng nhập tên điểm du lịch']
+    },
+    locationDescription: {
+      type: String,
+      trim: true
+    },
     location: {
       type: { 
         type: String, 
@@ -19,7 +27,7 @@ const HotelSchema = new mongoose.Schema(
       },
       coordinates: { 
         type: [Number], 
-        required: [true, 'Vui lòng nhập tọa độ']
+        //required: [true, 'Vui lòng nhập tọa độ']
       } // [longitude, latitude]
     },
     rating: { 
@@ -30,18 +38,57 @@ const HotelSchema = new mongoose.Schema(
     },
     description: { 
       type: String,
-      trim: true 
+      trim: true,
+      required: [true, 'Vui lòng nhập mô tả khách sạn']
     },
     ownerId: { 
       type: String,
       required: [true, 'Vui lòng chọn chủ khách sạn']
     },
-    amenities: [{ 
-      type: String 
-    }],
+    website: {
+      type: String,
+      trim: true
+    },
+    featuredImage: {
+      type: String
+    },
     images: [{ 
       type: String 
     }],
+    amenities: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Amenity'
+    }],
+    policies: {
+      checkInTime: {
+        type: String,
+        default: "14:00"
+      },
+      checkOutTime: {
+        type: String,
+        default: "12:00"
+      },
+      cancellationPolicy: {
+        type: String,
+        enum: ['24h-full-refund', '24h-half-refund', 'no-refund'],
+        default: 'no-refund'
+      },
+      childrenPolicy: { 
+        type: String, 
+        enum: ['yes', 'no'],
+        default: 'no' 
+      },
+      petPolicy: { 
+        type: String, 
+        enum: ['yes', 'no'], 
+        default: 'no' 
+      },
+      smokingPolicy: { 
+        type: String, 
+        enum: ['yes', 'no'], 
+        default: 'no' 
+      }
+    },
     status: { 
       type: String,
       enum: ['active', 'inactive', 'pending'],
