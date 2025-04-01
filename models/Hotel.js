@@ -19,17 +19,6 @@ const HotelSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    location: {
-      type: { 
-        type: String, 
-        enum: ['Point'], 
-        default: 'Point' 
-      },
-      coordinates: { 
-        type: [Number], 
-        //required: [true, 'Vui lòng nhập tọa độ']
-      } // [longitude, latitude]
-    },
     rating: { 
       type: Number, 
       default: 0,
@@ -50,10 +39,14 @@ const HotelSchema = new mongoose.Schema(
       trim: true
     },
     featuredImage: {
-      type: String
+      data: Buffer,
+      contentType: String,
+      filename: String
     },
     images: [{ 
-      type: String 
+      data: Buffer,
+      contentType: String,
+      filename: String
     }],
     amenities: [{
       type: mongoose.Schema.Types.ObjectId,
@@ -100,8 +93,6 @@ const HotelSchema = new mongoose.Schema(
   }
 );
 
-// Tạo index cho location để hỗ trợ tìm kiếm theo vị trí
-HotelSchema.index({ location: "2dsphere" });
 
 // Tạo index cho tìm kiếm theo tên
 HotelSchema.index({ name: 'text' });

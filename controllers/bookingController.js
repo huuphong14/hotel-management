@@ -377,20 +377,33 @@ exports.zaloPayReturn = async (req, res) => {
   }
 };
 
+
 // Cập nhật phương thức cancelBooking để sử dụng các tính năng mới
 exports.cancelBooking = async (req, res) => {
   try {
+    console.log(`=== BẮT ĐẦU HỦY BOOKING ${req.params.id} ===`);
+    console.log(`Người dùng ${req.user.id} yêu cầu hủy booking ${req.params.id}`);
+    
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
+      console.log(`Không tìm thấy booking với ID ${req.params.id}`);
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy booking'
       });
     }
 
+    console.log(`Thông tin booking tìm thấy: ${JSON.stringify({
+      id: booking._id,
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      userId: booking.user
+    })}`);
+
     // Kiểm tra quyền hủy booking
     if (booking.user.toString() !== req.user.id && req.user.role !== 'admin') {
+      console.log(`Người dùng ${req.user.id} không có quyền hủy booking ${booking._id}`);
       return res.status(403).json({
         success: false,
         message: 'Không có quyền hủy booking này'
@@ -399,33 +412,68 @@ exports.cancelBooking = async (req, res) => {
 
     // Kiểm tra trạng thái booking có thể hủy
     if (!['confirmed', 'pending'].includes(booking.status)) {
+      console.log(`Không thể hủy booking ${booking._id} với trạng thái ${booking.status}`);
       return res.status(400).json({
         success: false,
-        message: 'Không thể hủy booking này'
+        message: 'Không thể hủy booking với trạng thái hiện tại'
       });
     }
 
-    // Kiểm tra nếu đã thanh toán thì thực hiện hoàn tiền
-    if (booking.paymentStatus === 'paid') {
-      console.log("Processing refund for booking:", booking._id);
-      const refundResult = await ZaloPayService.refundPayment(booking);
+    // Kiểm tra thời gian check-in so với thời gian hiện tại
+    const now = new Date();
+    const checkInDate = new Date(booking.checkIn);
+    const timeUntilCheckIn = checkInDate - now;
+    const hoursUntilCheckIn = timeUntilCheckIn / (1000 * 60 * 60);
 
-      if (!refundResult) {
-        return res.status(400).json({
+    console.log(`Thời gian còn lại đến check-in: ${hoursUntilCheckIn.toFixed(2)} giờ`);
+
+    // Kiểm tra chính sách hủy phòng (Ví dụ: chỉ được hủy trước 24h)
+    const CANCELLATION_POLICY_HOURS = 24;
+    if (hoursUntilCheckIn < CANCELLATION_POLICY_HOURS) {
+      console.log(`Không thể hủy booking ${booking._id}, còn ít hơn ${CANCELLATION_POLICY_HOURS} giờ đến check-in`);
+      return res.status(400).json({
+        success: false,
+        message: `Không thể hủy booking khi còn ít hơn ${CANCELLATION_POLICY_HOURS} giờ đến thời gian check-in`
+      });
+    }
+
+    // Xử lý theo trạng thái thanh toán
+    if (booking.paymentStatus === 'paid') {
+      console.log(`Booking ${booking._id} đã được thanh toán, tiến hành hoàn tiền`);
+      
+      try {
+        const refundResult = await ZaloPayService.refundPayment(booking);
+        console.log(`Kết quả hoàn tiền: ${refundResult ? 'Thành công' : 'Thất bại'}`);
+
+        if (!refundResult) {
+          return res.status(400).json({
+            success: false,
+            message: 'Không thể hoàn tiền, vui lòng liên hệ hỗ trợ'
+          });
+        }
+        
+        // ZaloPayService.refundPayment đã cập nhật trạng thái booking
+        res.status(200).json({
+          success: true,
+          message: 'Hủy booking và hoàn tiền thành công'
+        });
+      } catch (refundError) {
+        console.error(`Lỗi hoàn tiền: ${refundError.message}`);
+        return res.status(500).json({
           success: false,
-          message: 'Không thể hoàn tiền'
+          message: `Lỗi hoàn tiền: ${refundError.message}`
         });
       }
-      
-      // ZaloPayService.refundPayment đã cập nhật trạng thái booking
-      res.status(200).json({
-        success: true,
-        message: 'Hủy booking và hoàn tiền thành công'
-      });
     } else {
       // Nếu chưa thanh toán, chỉ cần cập nhật trạng thái
+      console.log(`Booking ${booking._id} chưa thanh toán, chỉ cập nhật trạng thái`);
+      
       booking.status = 'cancelled';
+      booking.cancelledAt = new Date();
+      booking.cancellationReason = 'user_requested';
       await booking.save();
+      
+      console.log(`Đã cập nhật booking ${booking._id} thành trạng thái 'cancelled'`);
       
       // Gửi thông báo hủy
       await NotificationService.createNotification({
@@ -437,16 +485,21 @@ exports.cancelBooking = async (req, res) => {
         relatedId: booking._id
       });
       
+      console.log(`Đã gửi thông báo hủy booking cho người dùng ${booking.user}`);
+      
       res.status(200).json({
         success: true,
         message: 'Hủy booking thành công'
       });
     }
+    
+    console.log(`=== KẾT THÚC HỦY BOOKING ${req.params.id} ===`);
   } catch (error) {
-    console.error("Booking cancellation error:", error);
+    console.error(`Lỗi hủy booking: ${error.message}`);
+    console.error(`Stack: ${error.stack}`);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server khi hủy booking'
     });
   }
 };
