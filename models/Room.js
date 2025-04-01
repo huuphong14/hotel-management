@@ -39,8 +39,9 @@ const RoomSchema = new mongoose.Schema({
     trim: true
   }],
   images: [{
-    type: String,
-    trim: true
+    url: String,
+    publicId: String,
+    filename: String
   }],
   cancellationPolicy: {
     type: String,

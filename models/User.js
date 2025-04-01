@@ -32,9 +32,15 @@ const UserSchema = new mongoose.Schema({
     minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự'],
     select: false
   },
-  avatar: {
+  avatar: [{
+    url: String,
+    publicId: String,
+    filename: String
+  }],
+  // Vẫn giữ một giá trị mặc định để hiển thị khi không có avatar
+  defaultAvatar: {
     type: String,
-    default: 'default-avatar.jpg'
+    default: 'https://res.cloudinary.com/dssrbosuv/image/upload/v1728055710/samples/man-portrait.jpg'
   },
   role: {
     type: String,

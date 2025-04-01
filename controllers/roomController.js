@@ -1,6 +1,7 @@
 const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
 const Booking = require('../models/Booking');
+const cloudinaryService = require('../config/cloudinaryService');
 
 // @desc    Tạo phòng mới cho khách sạn
 // @route   POST /api/hotels/:hotelId/rooms
@@ -13,19 +14,30 @@ exports.createRoom = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy khách sạn' });
     }
 
-    // Kiểm tra xem tất cả tiện ích của phòng có nằm trong tiện ích của khách sạn không
-    const isValidAmenities = amenities.every(amenity => hotel.amenities.includes(amenity));
-
-    if (!isValidAmenities) {
-      return res.status(400).json({ message: "Tiện ích phòng không hợp lệ" });
-    }
-
     // Kiểm tra quyền
     if (hotel.ownerId.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền thêm phòng' });
     }
 
+    // Kiểm tra và xử lý tiện ích
+    const amenities = req.body.amenities ? JSON.parse(req.body.amenities) : [];
+    const isValidAmenities = amenities.every(amenity => hotel.amenities.includes(amenity));
+    if (!isValidAmenities) {
+      return res.status(400).json({ message: "Tiện ích phòng không hợp lệ" });
+    }
+
+    // Xử lý upload hình ảnh lên Cloudinary nếu có
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = await cloudinaryService.uploadManyFromBuffer(req.files, 'rooms');
+    }
+
+    // Gán dữ liệu vào body
     req.body.hotelId = req.params.hotelId;
+    req.body.amenities = amenities;
+    req.body.images = images;
+
+    // Tạo phòng mới
     const room = await Room.create(req.body);
 
     res.status(201).json({ success: true, data: room });
@@ -166,7 +178,7 @@ exports.updateRoom = async (req, res) => {
       });
     }
 
-    // Kiểm tra quyền (thêm role admin)
+    // Kiểm tra quyền
     if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -174,8 +186,8 @@ exports.updateRoom = async (req, res) => {
       });
     }
 
-    // Validate dữ liệu cập nhật
-    const allowedFields = ['name', 'type', 'price', 'capacity', 'description', 'amenities', 'images', 'isAvailable'];
+    // Xử lý dữ liệu cập nhật
+    const allowedFields = ['roomType', 'bedType', 'price', 'capacity', 'squareMeters', 'amenities', 'cancellationPolicy', 'status'];
     const updateData = {};
     Object.keys(req.body).forEach(key => {
       if (allowedFields.includes(key)) {
@@ -183,13 +195,36 @@ exports.updateRoom = async (req, res) => {
       }
     });
 
+    // Xử lý amenities nếu có
+    if (req.body.amenities) {
+      const amenities = JSON.parse(req.body.amenities);
+      const isValidAmenities = amenities.every(amenity => hotel.amenities.includes(amenity));
+      if (!isValidAmenities) {
+        return res.status(400).json({ message: "Tiện ích phòng không hợp lệ" });
+      }
+      updateData.amenities = amenities;
+    }
+
+    // Xử lý hình ảnh
+    if (req.files && req.files.length > 0) {
+      // Upload ảnh mới
+      const newImages = await cloudinaryService.uploadManyFromBuffer(req.files, 'rooms');
+
+      // Xóa ảnh cũ trên Cloudinary nếu có
+      if (room.images && room.images.length > 0) {
+        const publicIds = room.images.map(img => img.publicId);
+        await cloudinaryService.deleteMany(publicIds);
+      }
+
+      // Gán ảnh mới vào updateData
+      updateData.images = newImages;
+    }
+
+    // Cập nhật phòng
     room = await Room.findByIdAndUpdate(
       req.params.id,
       updateData,
-      {
-        new: true,
-        runValidators: true
-      }
+      { new: true, runValidators: true }
     ).populate({
       path: 'hotelId',
       select: 'name address'

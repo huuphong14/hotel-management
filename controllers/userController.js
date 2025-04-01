@@ -5,6 +5,7 @@ const asyncHandler = require('../middlewares/asyncHandler');
 const sendEmail = require('../utils/sendEmail');
 const fs = require('fs');
 const path = require('path');
+const cloudinaryService = require('../config/cloudinaryService');
 
 // @desc    Lấy thông tin người dùng hiện tại
 // @route   GET /api/users/me
@@ -82,7 +83,7 @@ exports.updateMe = asyncHandler(async (req, res) => {
 });
 
 // @desc    Upload avatar
-// @route   PUT /api/users/me/avatar
+// @route   PATCH /api/users/me/avatar
 // @access  Private
 exports.uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -95,24 +96,39 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
   // Lấy thông tin người dùng
   const user = await User.findById(req.user.id);
   
-  // Xóa avatar cũ nếu không phải avatar mặc định
-  if (user.avatar !== 'default-avatar.jpg') {
-    const oldAvatarPath = path.join(__dirname, '../public/uploads/profiles/', user.avatar);
-    if (fs.existsSync(oldAvatarPath)) {
-      fs.unlinkSync(oldAvatarPath);
+  try {
+    // Upload avatar mới lên Cloudinary trong folder users
+    const uploadResult = await cloudinaryService.uploadFromBuffer(req.file, 'users');
+    
+    // Xóa avatar cũ trên Cloudinary nếu có
+    if (user.avatar && user.avatar.length > 0) {
+      // Lấy danh sách publicId để xóa
+      const publicIdsToDelete = user.avatar.map(img => img.publicId);
+      await cloudinaryService.deleteMany(publicIdsToDelete);
     }
+    
+    // Cập nhật avatar mới trong DB
+    user.avatar = [{
+      url: uploadResult.url,
+      publicId: uploadResult.publicId,
+      filename: uploadResult.filename
+    }];
+    
+    await user.save();
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tải lên avatar. Vui lòng thử lại sau',
+      error: error.message
+    });
   }
-  
-  // Cập nhật avatar mới
-  user.avatar = req.file.filename;
-  await user.save();
-  
-  res.status(200).json({
-    success: true,
-    data: {
-      avatar: user.avatar
-    }
-  });
 });
 
 // @desc    Đổi mật khẩu

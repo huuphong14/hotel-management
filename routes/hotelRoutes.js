@@ -6,8 +6,8 @@ const {
   updateHotel,
   deleteHotel,
   uploadHotelImages,
-  getHotelImage,
-  getFeaturedImage
+  deleteHotelImage,
+  updateFeaturedImage
 } = require('../controllers/hotelController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -35,8 +35,6 @@ const upload = multer({
 // Public routes
 router.get('/', getHotels);
 router.get('/:id', getHotel);
-router.get('/:id/images/:imageIndex', getHotelImage); // Route để lấy ảnh từ array images
-router.get('/:id/featured-image', getFeaturedImage); // Route để lấy ảnh đại diện
 
 // Protected routes
 router.use(protect);
@@ -54,5 +52,11 @@ router.delete('/:id', authorize('partner'), deleteHotel);
 
 // Route để upload ảnh riêng lẻ
 router.post('/:id/images', authorize('partner'), upload.array('images', 10), uploadHotelImages);
+
+// Route để xóa một ảnh
+router.delete('/:id/images/:imageIndex', authorize('partner'), deleteHotelImage);
+
+// Route để cập nhật ảnh đại diện
+router.put('/:id/featured-image', authorize('partner'), upload.single('featuredImage'), updateFeaturedImage);
 
 module.exports = router;
