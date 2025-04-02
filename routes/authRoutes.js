@@ -21,8 +21,26 @@ const {
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 const passport = require('passport');
+const multer = require('multer');
 
 const router = express.Router();
+
+// Cấu hình multer cho việc xử lý file tạm thời
+const storage = multer.memoryStorage();
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Giới hạn 5MB
+  },
+  fileFilter: (req, file, cb) => {
+    // Chỉ chấp nhận file ảnh
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file hình ảnh'), false);
+    }
+  }
+});
 
 // Auth routes
 router.post('/register', register);
@@ -56,7 +74,13 @@ router.get(
 );
 
 // Partner routes
-router.post('/register-partner', registerPartner);
+router.post('/register-partner', 
+  upload.fields([
+    { name: 'featuredImage', maxCount: 1 },
+    { name: 'hotelImages', maxCount: 10 }
+  ]), 
+  registerPartner
+);
 
 // Admin routes
 router.use(protect);

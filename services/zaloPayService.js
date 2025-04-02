@@ -150,7 +150,7 @@ class ZaloPayService {
       throw new Error('Giao dịch này đã được hoàn tiền');
     }
 
-    console.log(`Giao dịch thanh toán tìm thấy: ${payment.transactionId}, ZaloPay Transaction ID: ${payment.zpTransactionId}`);
+    console.log(`Giao dịch thanh toán tìm thấy: ${payment.transactionId}, ZaloPay Transaction ID: ${payment.transactionId}`);
 
     // Tạo dữ liệu cho yêu cầu hoàn tiền
     const refundTransId = this.generateTransactionId();
@@ -159,7 +159,7 @@ class ZaloPayService {
     const refundData = {
       app_id: this.config.appId,
       app_trans_id: refundTransId, // ID giao dịch mới cho hoàn tiền
-      zp_trans_id: payment.zpTransactionId, // Sử dụng zpTransactionId - ID giao dịch của ZaloPay
+      zp_trans_id: payment.transactionId, // Sử dụng TransactionId - ID giao dịch của ZaloPay
       amount: payment.amount,
       description: `Refund for Booking ${booking._id}`,
       timestamp: Date.now()
