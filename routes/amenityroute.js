@@ -8,7 +8,7 @@ const {
   deleteAmenity
 } = require('../controllers/amenityController');
 
-const { protect } = require('../middleware/auth');
+const { protect } = require('../middlewares/auth');
 const {authorize} = require('../middlewares/roleCheck')
 
 router
