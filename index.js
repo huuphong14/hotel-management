@@ -19,6 +19,7 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
+const amenityRoute = require('./routes/amenityroute');
 
 // Khởi tạo express
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/vouchers', voucherRoutes);
+app.use('/api/amenities', amenityRoute);
 
 // Route mặc định
 app.get('/', (req, res) => {
