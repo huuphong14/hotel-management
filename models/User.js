@@ -32,15 +32,17 @@ const UserSchema = new mongoose.Schema({
     minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự'],
     select: false
   },
-  avatar: [{
-    url: String,
-    publicId: String,
-    filename: String
-  }],
-  // Vẫn giữ một giá trị mặc định để hiển thị khi không có avatar
-  defaultAvatar: {
-    type: String,
-    default: 'https://res.cloudinary.com/dssrbosuv/image/upload/v1728055710/samples/man-portrait.jpg'
+  avatar: {
+    type: [{
+      url: String,
+      publicId: String,
+      filename: String
+    }],
+    default: [{
+      url: 'https://res.cloudinary.com/dssrbosuv/image/upload/v1728055710/samples/man-portrait.jpg',
+      publicId: 'default_avatar',
+      filename: 'default-avatar.jpg'
+    }]
   },
   role: {
     type: String,
@@ -50,7 +52,7 @@ const UserSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: ['pending', 'active', 'rejected'],
-    default: 'active' // mặc định active cho user thường, pending cho partner
+    default: 'active'
   },
   isEmailVerified: {
     type: Boolean,
@@ -74,7 +76,11 @@ const UserSchema = new mongoose.Schema({
     select: false
   },
   verificationToken: String,
-  verificationTokenExpire: Date
+  verificationTokenExpire: Date,
+  favoriteHotels: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Hotel'
+  }]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -147,16 +153,13 @@ UserSchema.methods.getRefreshToken = function() {
 
 // Tạo token xác thực email
 UserSchema.methods.getVerificationToken = function() {
-  // Tạo token
   const verificationToken = crypto.randomBytes(20).toString('hex');
   
-  // Hash token và set vào field verificationToken
   this.verificationToken = crypto
     .createHash('sha256')
     .update(verificationToken)
     .digest('hex');
     
-  // Set thời gian hết hạn (24 giờ)
   this.verificationTokenExpire = Date.now() + 24 * 60 * 60 * 1000;
   
   return verificationToken;

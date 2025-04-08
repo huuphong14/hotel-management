@@ -20,6 +20,7 @@ const reviewRoutes = require('./routes/reviewRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
 const amenityRoute = require('./routes/amenityroute');
+const favoriteRoutes = require('./routes/favoriteRoutes');
 
 // Khởi tạo express
 const app = express();
@@ -59,7 +60,7 @@ socketIO.init(server);
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
+app.use('/api/users', favoriteRoutes, userRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/posts', postRoutes);
