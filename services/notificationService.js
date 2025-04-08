@@ -11,7 +11,7 @@ class NotificationService {
       const notification = await Notification.create({
         userId: booking.user,
         title: 'Xác nhận đặt phòng',
-        message: `Đơn đặt phòng #${booking._id} cho "${booking.room.name}" từ ${new Date(booking.checkIn).toLocaleDateString('vi-VN')} đến ${new Date(booking.checkOut).toLocaleDateString('vi-VN')} đã được tạo thành công. Vui lòng thanh toán để xác nhận.`,
+        message: `Đơn đặt phòng #${booking._id} từ ${new Date(booking.checkIn).toLocaleDateString('vi-VN')} đến ${new Date(booking.checkOut).toLocaleDateString('vi-VN')} đã được tạo thành công. Vui lòng thanh toán để xác nhận.`,
         type: 'booking',
         relatedId: booking._id,
         refModel: 'Booking'

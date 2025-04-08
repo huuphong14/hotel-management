@@ -10,10 +10,16 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  transactionId: {  // Add this field
+  // ID giao dịch nội bộ (app_trans_id) - giữ nguyên tên trường để tương thích ngược
+  transactionId: {
     type: String,
     required: true,
     unique: true
+  },
+  // ID giao dịch từ ZaloPay (zp_trans_id)
+  zpTransId: {
+    type: String,
+    index: true
   },
   paymentMethod: {
     type: String,
@@ -23,8 +29,24 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded'],
+    enum: ['pending', 'completed', 'failed', 'refunded', 'refunding', 'refund_failed'],
     default: 'pending'
+  },
+  // Thêm các trường cho hoàn tiền
+  refundTransactionId: {
+    type: String
+  },
+  zaloRefundId: {
+    type: String
+  },
+  refundTimestamp: {
+    type: Date
+  },
+  refundAmount: {
+    type: Number
+  },
+  refundFailReason: {
+    type: String
   }
 }, {
   timestamps: true
@@ -32,5 +54,7 @@ const paymentSchema = new mongoose.Schema({
 
 // Indexes
 paymentSchema.index({ bookingId: 1, status: 1 });
+paymentSchema.index({ zpTransId: 1 });
+paymentSchema.index({ refundTransactionId: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

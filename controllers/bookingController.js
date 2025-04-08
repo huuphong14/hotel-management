@@ -201,10 +201,6 @@ exports.getMyBookings = async (req, res) => {
   }
 };
 
-// @desc    Hủy booking
-// @route   PUT /api/bookings/:id/cancel
-// @access  Private
-
 
 // @desc    Cập nhật trạng thái booking
 // @route   PUT /api/bookings/:id/status

@@ -471,7 +471,7 @@ exports.facebookCallback = async (req, res) => {
 };
 
 // @desc    Đăng ký đối tác và tạo khách sạn
-// @route   POST /api/users/register-partner
+// @route   POST /api/auth/register-partner
 // @access  Public
 exports.registerPartner = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
@@ -503,7 +503,7 @@ exports.registerPartner = asyncHandler(async (req, res) => {
     } = req.body;
 
     // Kiểm tra các trường bắt buộc
-    if (!name || !email || !phone || !hotelName || !hotelAddress || !hotelCoordinates || !hotelDescription || !hotelLocationName) {
+    if (!name || !email || !phone || !hotelName || !hotelAddress || !hotelDescription || !hotelLocationName) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
