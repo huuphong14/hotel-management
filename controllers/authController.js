@@ -153,18 +153,17 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (!user.isEmailVerified) {
+    if (!user.isEmailVerified || user.status !== 'active') {
       return res.status(401).json({
         success: false,
-        message: 'Vui lòng xác thực email trước khi đăng nhập'
+        message: 'Tài khoản chưa được xác thực hoặc chưa được kích hoạt'
       });
     }
-
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Thông tin đăng nhập không chính xác'
+        message: 'Thông tin đăng nhập không chính xác mk'
       });
     }
 
@@ -488,7 +487,7 @@ exports.registerPartner = asyncHandler(async (req, res) => {
       hotelName, 
       hotelAddress, 
       hotelDescription,
-      hotelLocationName,
+      locationId, // Thay thế hotelLocationName bằng locationId
       hotelLocationDescription,
       hotelAmenities,
       hotelWebsite,
@@ -503,7 +502,7 @@ exports.registerPartner = asyncHandler(async (req, res) => {
     } = req.body;
 
     // Kiểm tra các trường bắt buộc
-    if (!name || !email || !phone || !hotelName || !hotelAddress || !hotelDescription || !hotelLocationName) {
+    if (!name || !email || !phone || !hotelName || !hotelAddress || !hotelDescription || !locationId) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({
@@ -526,60 +525,64 @@ exports.registerPartner = asyncHandler(async (req, res) => {
     // Xử lý tải lên hình ảnh
     let featuredImage = null;
     let hotelImages = [];
-
+    
     // Xử lý ảnh đại diện (featuredImage)
     if (req.files && req.files.featuredImage) {
       try {
+        console.log('Featured image file:', JSON.stringify({
+          originalname: req.files.featuredImage[0].originalname,
+          mimetype: req.files.featuredImage[0].mimetype,
+          size: req.files.featuredImage[0].size
+        }));
+        
         const uploadedFeaturedImage = await cloudinaryService.uploadFromBuffer(
           req.files.featuredImage[0], 
           'hotels'
         );
+        
+        console.log('Cloudinary response for featured image:', JSON.stringify(uploadedFeaturedImage));
+        
         featuredImage = {
           url: uploadedFeaturedImage.url,
           publicId: uploadedFeaturedImage.publicId,
           filename: uploadedFeaturedImage.filename
         };
+        
+        console.log('Final featuredImage object:', JSON.stringify(featuredImage));
       } catch (uploadError) {
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: 'Lỗi khi tải lên ảnh đại diện',
-          error: uploadError.message
-        });
+        console.error('Error uploading featured image:', uploadError);
       }
+    } else {
+      console.log('No featured image provided in the request');
     }
-
+    
     // Xử lý các ảnh khác của khách sạn (hotelImages)
     if (req.files && req.files.hotelImages && req.files.hotelImages.length > 0) {
       try {
+        console.log('Hotel images files count:', req.files.hotelImages.length);
+        
         const uploadedHotelImages = await cloudinaryService.uploadManyFromBuffer(
           req.files.hotelImages, 
           'hotels'
         );
+        
+        console.log('Cloudinary response for hotel images:', JSON.stringify(uploadedHotelImages));
+        
         hotelImages = uploadedHotelImages.map(img => ({
           url: img.url,
           publicId: img.publicId,
           filename: img.filename
         }));
-      } catch (uploadError) {
-        // Nếu có lỗi, xóa ảnh đại diện đã upload (nếu có)
-        if (featuredImage && featuredImage.publicId) {
-          await cloudinaryService.deleteFile(featuredImage.publicId);
-        }
         
-        await session.abortTransaction();
-        session.endSession();
-        return res.status(400).json({
-          success: false,
-          message: 'Lỗi khi tải lên ảnh khách sạn',
-          error: uploadError.message
-        });
+        console.log('Final hotelImages array:', JSON.stringify(hotelImages));
+      } catch (uploadError) {
+        console.error('Error uploading hotel images:', uploadError);
       }
+    } else {
+      console.log('No hotel images provided in the request');
     }
 
     // Tạo người dùng mới với vai trò 'partner'
-    // Password sẽ được tạo ngẫu nhiên khi admin duyệt
     const user = await User.create([{
       name,
       email,
@@ -597,7 +600,7 @@ exports.registerPartner = asyncHandler(async (req, res) => {
       name: hotelName,
       address: hotelAddress,
       description: hotelDescription,
-      locationName: hotelLocationName,
+      locationId: locationId, // Sử dụng locationId thay vì locationName
       locationDescription: hotelLocationDescription,
       ownerId: newUser._id,
       website: hotelWebsite,
@@ -608,9 +611,9 @@ exports.registerPartner = asyncHandler(async (req, res) => {
         checkInTime: checkInTime || "14:00",
         checkOutTime: checkOutTime || "12:00",
         cancellationPolicy: cancellationPolicy || "no-refund",
-        childrenPolicy: childrenPolicy || "",
-        petPolicy: petPolicy || "",
-        smokingPolicy: smokingPolicy || ""
+        childrenPolicy: childrenPolicy || "no",
+        petPolicy: petPolicy || "no",
+        smokingPolicy: smokingPolicy || "no"
       },
       status: 'pending' // Trạng thái chờ duyệt
     }], { session });
@@ -711,10 +714,7 @@ exports.approvePartner = async (req, res) => {
 
     // Tạo mật khẩu ngẫu nhiên
     const plainPassword = crypto.randomBytes(6).toString('hex');
-    
-    // Hash mật khẩu và cập nhật trạng thái người dùng
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(plainPassword, salt);
+    user.password = plainPassword;
     user.status = 'active';
     await user.save();
 

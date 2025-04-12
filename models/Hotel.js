@@ -2,35 +2,36 @@ const mongoose = require("mongoose");
 
 const HotelSchema = new mongoose.Schema(
   {
-    name: { 
-      type: String, 
+    name: {
+      type: String,
       required: [true, 'Vui lòng nhập tên khách sạn'],
-      trim: true 
+      trim: true
     },
-    address: { 
+    address: {
       type: String,
       required: [true, 'Vui lòng nhập địa chỉ']
     },
-    locationName: { 
-      type: String,
-      required: [true, 'Vui lòng nhập tên điểm du lịch']
+    locationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Location',
+      required: [true, 'Vui lòng chọn địa điểm du lịch']
     },
     locationDescription: {
       type: String,
       trim: true
     },
-    rating: { 
-      type: Number, 
+    rating: {
+      type: Number,
       default: 0,
       min: [0, 'Đánh giá không thể nhỏ hơn 0'],
       max: [5, 'Đánh giá không thể lớn hơn 5']
     },
-    description: { 
+    description: {
       type: String,
       trim: true,
       required: [true, 'Vui lòng nhập mô tả khách sạn']
     },
-    ownerId: { 
+    ownerId: {
       type: String,
       required: [true, 'Vui lòng chọn chủ khách sạn']
     },
@@ -40,10 +41,10 @@ const HotelSchema = new mongoose.Schema(
     },
     featuredImage: {
       url: String,
-      publicId: String, 
+      publicId: String,
       filename: String
     },
-    images: [{ 
+    images: [{
       url: String,
       publicId: String,
       filename: String
@@ -66,29 +67,47 @@ const HotelSchema = new mongoose.Schema(
         enum: ['24h-full-refund', '24h-half-refund', 'no-refund'],
         default: 'no-refund'
       },
-      childrenPolicy: { 
-        type: String, 
+      childrenPolicy: {
+        type: String,
         enum: ['yes', 'no'],
-        default: 'no' 
+        default: 'no'
       },
-      petPolicy: { 
-        type: String, 
-        enum: ['yes', 'no'], 
-        default: 'no' 
+      petPolicy: {
+        type: String,
+        enum: ['yes', 'no'],
+        default: 'no'
       },
-      smokingPolicy: { 
-        type: String, 
-        enum: ['yes', 'no'], 
-        default: 'no' 
+      smokingPolicy: {
+        type: String,
+        enum: ['yes', 'no'],
+        default: 'no'
       }
     },
-    status: { 
+    favoriteCount: {
+      type: Number,
+      default: 0
+    },
+    lowestPrice: {
+      type: Number,
+      default: 0
+    },
+    lowestDiscountedPrice: {
+      type: Number,
+      default: 0
+    },
+    highestDiscountPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100
+    },
+    status: {
       type: String,
       enum: ['active', 'inactive', 'pending'],
       default: 'pending'
     }
   },
-  { 
+  {
     timestamps: true // Tự động thêm createdAt và updatedAt
   }
 );

@@ -1,4 +1,5 @@
 const Hotel = require('../models/Hotel');
+const Room = require('../models/Room')
 const cloudinaryService = require('../config/cloudinaryService');
 
 // @desc    Tạo khách sạn mới
@@ -34,17 +35,141 @@ exports.createHotel = async (req, res) => {
   }
 };
 
+// @desc    Lấy danh sách khách sạn của người dùng đăng nhập
+// @route   GET /api/hotels/my-hotels
+// @access  Private (Partner)
+exports.getMyHotels = async (req, res) => {
+  try {
+    // Lấy ID của người dùng đang đăng nhập
+    const userId = req.user.id;
+    
+    // Kiểm tra nếu người dùng có vai trò partner
+    if (req.user.role !== 'partner') {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ đối tác mới có thể xem danh sách khách sạn của mình'
+      });
+    }
+    
+    console.log(`Đang tìm kiếm khách sạn của đối tác ${userId}`);
+    
+    // Tìm tất cả khách sạn mà người dùng sở hữu
+    const hotels = await Hotel.find({ ownerId: userId })
+      
+    console.log(`Đã tìm thấy ${hotels.length} khách sạn của đối tác`);
+    
+    // Trả về kết quả
+    res.status(200).json({
+      success: true,
+      count: hotels.length,
+      data: hotels
+    });
+  } catch (error) {
+    console.error('Lỗi khi lấy danh sách khách sạn của đối tác:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server'
+    });
+  }
+};
+
 // @desc    Lấy danh sách khách sạn
 // @route   GET /api/hotels
 // @access  Public
 exports.getHotels = async (req, res) => {
   try {
-    const hotels = await Hotel.find().populate('ownerId', 'name email');
+    const {
+      name,
+      locationId,
+      minPrice,
+      maxPrice,
+      minDiscountPercent, // Thêm tham số mới
+      sort = '-createdAt',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Xây dựng query
+    const query = {};
+
+    if (name) {
+      query.name = { $regex: name, $options: 'i' };
+    }
+
+    if (locationId) {
+      query.locationId = locationId;
+    }
+
+    // Lọc theo giá (sử dụng giá sau giảm)
+    if (minPrice || maxPrice) {
+      query.lowestDiscountedPrice = {};
+      if (minPrice) query.lowestDiscountedPrice.$gte = Number(minPrice);
+      if (maxPrice) query.lowestDiscountedPrice.$lte = Number(maxPrice);
+    }
+
+    // Lọc theo phần trăm giảm giá
+    if (minDiscountPercent) {
+      query.highestDiscountPercent = { $gte: Number(minDiscountPercent) };
+    }
+
+    // Áp dụng trạng thái
+    query.status = 'active';
+
+    // Xây dựng tùy chọn sắp xếp
+    let sortOption = sort;
+    if (sort === 'price') {
+      sortOption = 'lowestDiscountedPrice';
+    } else if (sort === '-price') {
+      sortOption = '-lowestDiscountedPrice';
+    } else if (sort === 'discount') {
+      sortOption = 'highestDiscountPercent';
+    } else if (sort === '-discount') {
+      sortOption = '-highestDiscountPercent';
+    }
+
+    // Tính toán pagination
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Thực hiện query
+    const hotels = await Hotel.find(query)
+      .populate('ownerId', 'name email')
+      .populate('locationId', 'name')
+      .sort(sortOption)
+      .skip(skip)
+      .limit(Number(limit));
+
+    // Đếm tổng số khách sạn thỏa mãn điều kiện
+    const total = await Hotel.countDocuments(query);
+
+    // Thêm thông tin giảm giá chi tiết vào kết quả
+    const hotelsWithDiscountDetails = hotels.map(hotel => {
+      const hotelObj = hotel.toObject();
+      
+      // Thêm thông tin về giảm giá
+      if (hotel.highestDiscountPercent > 0) {
+        hotelObj.hasDiscount = true;
+        hotelObj.originalPrice = hotel.lowestPrice;
+        hotelObj.discountedPrice = hotel.lowestDiscountedPrice;
+        hotelObj.discountPercent = hotel.highestDiscountPercent;
+        hotelObj.savingAmount = hotel.lowestPrice - hotel.lowestDiscountedPrice;
+      } else {
+        hotelObj.hasDiscount = false;
+        hotelObj.originalPrice = hotel.lowestPrice;
+        hotelObj.discountedPrice = hotel.lowestPrice;
+      }
+      
+      return hotelObj;
+    });
 
     res.status(200).json({
       success: true,
       count: hotels.length,
-      data: hotels
+      total,
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / Number(limit))
+      },
+      data: hotelsWithDiscountDetails
     });
   } catch (error) {
     console.error(error);
@@ -60,7 +185,9 @@ exports.getHotels = async (req, res) => {
 // @access  Public
 exports.getHotel = async (req, res) => {
   try {
-    const hotel = await Hotel.findById(req.params.id).populate('ownerId', 'name email');
+    const hotel = await Hotel.findById(req.params.id)
+      .populate('ownerId', 'name email')
+      .populate('locationId', 'name');
 
     if (!hotel) {
       return res.status(404).json({
@@ -149,6 +276,32 @@ exports.updateHotel = async (req, res) => {
     res.status(200).json({
       success: true,
       data: hotel
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server'
+    });
+  }
+};
+
+// @desc    Lấy danh sách khách sạn theo địa điểm
+// @route   GET /api/hotels/location/:locationId
+// @access  Public
+exports.getHotelsByLocation = async (req, res) => {
+  try {
+    const hotels = await Hotel.find({ 
+      locationId: req.params.locationId,
+      status: 'active'
+    })
+    .populate('locationId', 'name')
+    .populate('ownerId', 'name');
+    
+    res.status(200).json({
+      success: true,
+      count: hotels.length,
+      data: hotels
     });
   } catch (error) {
     console.error(error);
@@ -365,6 +518,72 @@ exports.updateFeaturedImage = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server'
+    });
+  }
+};
+
+// Thêm vào hotelController.js
+// @desc    Lấy danh sách khách sạn đang có giảm giá
+// @route   GET /api/hotels/discounts
+// @access  Public
+// Cập nhật hàm getDiscountedHotels trong hotelController.js
+exports.getDiscountedHotels = async (req, res) => {
+  try {
+    const {
+      sort = '-highestDiscountPercent',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Tìm khách sạn có giảm giá
+    const query = {
+      highestDiscountPercent: { $gt: 0 },
+      status: 'active'
+    };
+
+    // Tính toán phân trang
+    const skip = (Number(page) - 1) * Number(limit);
+
+    // Lấy thông tin khách sạn có giảm giá
+    const hotels = await Hotel.find(query)
+      .populate('ownerId', 'name email')
+      .populate('locationId', 'name')
+      .sort(sort)
+      .skip(skip)
+      .limit(Number(limit));
+
+    // Đếm tổng số khách sạn có giảm giá
+    const total = await Hotel.countDocuments(query);
+
+    // Định dạng lại kết quả với thông tin chi tiết về giảm giá
+    const hotelsWithDiscountInfo = hotels.map(hotel => {
+      const hotelObj = hotel.toObject();
+      
+      hotelObj.hasDiscount = true;
+      hotelObj.originalPrice = hotel.lowestPrice;
+      hotelObj.discountedPrice = hotel.lowestDiscountedPrice; 
+      hotelObj.discountPercent = hotel.highestDiscountPercent;
+      hotelObj.savingAmount = hotel.lowestPrice - hotel.lowestDiscountedPrice;
+      
+      return hotelObj;
+    });
+
+    res.status(200).json({
+      success: true,
+      count: hotelsWithDiscountInfo.length,
+      total,
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / Number(limit))
+      },
+      data: hotelsWithDiscountInfo
+    });
+  } catch (error) {
+    console.error('Chi tiết lỗi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
     });
   }
 };

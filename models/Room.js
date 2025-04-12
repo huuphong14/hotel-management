@@ -35,8 +35,8 @@ const RoomSchema = new mongoose.Schema({
     min: [0, 'Diện tích phòng không thể âm']
   },
   amenities: [{
-    type: String,
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Amenity'
   }],
   images: [{
     url: String,
@@ -49,13 +49,28 @@ const RoomSchema = new mongoose.Schema({
     enum: ['flexible', 'moderate', 'strict'],
     default: 'flexible'
   },
+  // Thêm vào model Room.js
+  discountPercent: {
+    type: Number,
+    min: [0, 'Phần trăm giảm giá không thể âm'],
+    max: [100, 'Phần trăm giảm giá không thể vượt quá 100%'],
+    default: 0
+  },
+  discountStartDate: {
+    type: Date,
+    default: null
+  },
+  discountEndDate: {
+    type: Date,
+    default: null
+  },
   status: {
     type: String,
     required: true,
     enum: ['available', 'booked', 'maintenance'],
     default: 'available'
   }
-}, { 
+}, {
   timestamps: true // Tự động thêm createdAt và updatedAt
 });
 

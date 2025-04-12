@@ -8,6 +8,7 @@ const passport = require('passport');
 const session = require('express-session');
 const http = require('http');
 const socketIO = require('./utils/socket');
+const { scheduleUpdateLowestPrices } = require('./utils/cronJobs');
 
 // Load các routes
 const authRoutes = require('./routes/authRoutes');
@@ -21,6 +22,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
 const amenityRoute = require('./routes/amenityroute');
 const favoriteRoutes = require('./routes/favoriteRoutes');
+const locationRoutes = require('./routes/locationRoutes');
 
 // Khởi tạo express
 const app = express();
@@ -58,9 +60,11 @@ require('./config/passport');
 // Khởi tạo Socket.IO
 socketIO.init(server);
 
+scheduleUpdateLowestPrices();
+
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', favoriteRoutes, userRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/hotels', hotelRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/posts', postRoutes);
@@ -69,6 +73,8 @@ app.use('/api/reviews', reviewRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/vouchers', voucherRoutes);
 app.use('/api/amenities', amenityRoute);
+app.use('/api/favorites', favoriteRoutes);
+app.use('/api/locations', locationRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {

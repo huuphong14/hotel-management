@@ -7,7 +7,10 @@ const {
   deleteHotel,
   uploadHotelImages,
   deleteHotelImage,
-  updateFeaturedImage
+  updateFeaturedImage,
+  getHotelsByLocation,
+  getMyHotels,
+  getDiscountedHotels
 } = require('../controllers/hotelController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -34,8 +37,11 @@ const upload = multer({
 
 // Public routes
 router.get('/', getHotels);
+router.get('/my-hotels', protect, authorize('partner'), getMyHotels);
 router.get('/:id', getHotel);
-
+router.get('/location/:locationId', getHotelsByLocation);
+router.get('/discounts', getDiscountedHotels);
+ 
 // Protected routes
 router.use(protect);
 router.post('/', authorize('partner'), upload.fields([
