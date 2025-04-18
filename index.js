@@ -23,6 +23,7 @@ const voucherRoutes = require('./routes/voucherRoutes');
 const amenityRoute = require('./routes/amenityroute');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const locationRoutes = require('./routes/locationRoutes');
+const statisticsRoutes = require('./routes/statisticsRoutes')
 
 // Khởi tạo express
 const app = express();
@@ -75,6 +76,7 @@ app.use('/api/vouchers', voucherRoutes);
 app.use('/api/amenities', amenityRoute);
 app.use('/api/favorites', favoriteRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 // Route mặc định
 app.get('/', (req, res) => {

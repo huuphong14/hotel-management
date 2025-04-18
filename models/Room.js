@@ -6,6 +6,16 @@ const RoomSchema = new mongoose.Schema({
     ref: 'Hotel',
     required: [true, 'Vui lòng chọn khách sạn']
   },
+  roomName: {
+    type: String,
+    required: [true, 'Vui lòng nhập tên phòng'],
+    trim: true
+  },
+  floor: {
+    type: Number,
+    required: [true, 'Vui lòng chọn tầng'],
+    min: [0, 'Tầng không thể âm']
+  },
   roomType: {
     type: String,
     required: [true, 'Vui lòng chọn loại phòng'],
@@ -49,7 +59,6 @@ const RoomSchema = new mongoose.Schema({
     enum: ['flexible', 'moderate', 'strict'],
     default: 'flexible'
   },
-  // Thêm vào model Room.js
   discountPercent: {
     type: Number,
     min: [0, 'Phần trăm giảm giá không thể âm'],
