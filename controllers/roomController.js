@@ -24,11 +24,22 @@ exports.createRoom = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Bạn không có quyền thêm phòng' });
     }
 
-    // Kiểm tra và xử lý tiện ích
+    // Kiểm tra và xử lý tiện ích phòng
     const amenities = req.body.amenities ? JSON.parse(req.body.amenities) : [];
-    const isValidAmenities = amenities.every(amenity => hotel.amenities.includes(amenity));
-    if (!isValidAmenities) {
-      return res.status(400).json({ message: "Tiện ích phòng không hợp lệ" });
+    
+    // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
+    if (amenities.length > 0) {
+      const validAmenities = await Amenity.find({
+        _id: { $in: amenities },
+        type: "room"
+      });
+      
+      if (validAmenities.length !== amenities.length) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại" 
+        });
+      }
     }
 
     // Xử lý upload hình ảnh lên Cloudinary nếu có
@@ -47,6 +58,42 @@ exports.createRoom = async (req, res) => {
     await updateHotelLowestPrice(req.params.hotelId);
 
     res.status(201).json({ success: true, data: room });
+  } catch (error) {
+    console.error('Chi tiết lỗi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Lấy thông tin chi tiết một phòng
+// @route   GET /api/rooms/:id
+// @access  Public
+exports.getRoom = async (req, res) => {
+  try {
+    const room = await Room.findById(req.params.id)
+      .populate({
+        path: 'hotelId',
+        select: 'name address rating images contact'
+      })
+      .populate({
+        path: 'amenities',
+        select: 'name icon description type'
+      });
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy phòng'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: room
+    });
   } catch (error) {
     console.error('Chi tiết lỗi:', error);
     res.status(500).json({
@@ -102,6 +149,10 @@ exports.getRooms = async (req, res) => {
         path: 'hotelId',
         select: 'name address rating'
       })
+      .populate({
+        path: 'amenities',
+        select: 'name icon description type'
+      })
       .sort(sort)
       .skip(skip)
       .limit(Number(limit));
@@ -118,38 +169,6 @@ exports.getRooms = async (req, res) => {
         totalPages: Math.ceil(total / Number(limit))
       },
       data: rooms
-    });
-  } catch (error) {
-    console.error('Chi tiết lỗi:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server',
-      error: error.message
-    });
-  }
-};
-
-// @desc    Lấy thông tin chi tiết một phòng
-// @route   GET /api/rooms/:id
-// @access  Public
-exports.getRoom = async (req, res) => {
-  try {
-    const room = await Room.findById(req.params.id)
-      .populate({
-        path: 'hotelId',
-        select: 'name address rating amenities images contact'
-      });
-
-    if (!room) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy phòng'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: room
     });
   } catch (error) {
     console.error('Chi tiết lỗi:', error);
@@ -204,10 +223,20 @@ exports.updateRoom = async (req, res) => {
     // Xử lý amenities nếu có
     if (req.body.amenities) {
       const amenities = JSON.parse(req.body.amenities);
-      const isValidAmenities = amenities.every(amenity => hotel.amenities.includes(amenity));
-      if (!isValidAmenities) {
-        return res.status(400).json({ message: "Tiện ích phòng không hợp lệ" });
+      
+      // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
+      const validAmenities = await Amenity.find({
+        _id: { $in: amenities },
+        type: "room"
+      });
+      
+      if (validAmenities.length !== amenities.length) {
+        return res.status(400).json({ 
+          success: false,
+          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại" 
+        });
       }
+      
       updateData.amenities = amenities;
     }
 

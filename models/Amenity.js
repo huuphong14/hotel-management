@@ -13,6 +13,10 @@ const AmenitySchema = new mongoose.Schema(
       enum: ["hotel", "room"],
       required: [true, "Vui lòng chọn loại tiện ích"],
     },
+    description: {
+      type: String,
+      trim: true
+    },
     icon: {
       type: String,
       trim: true

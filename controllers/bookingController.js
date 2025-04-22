@@ -5,6 +5,7 @@ const Voucher = require('../models/Voucher');
 const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
 const ZaloPayService = require('../services/zaloPayService')
+const VNPayService = require('../services/vnPayService');
 
 // @desc    Tạo booking mới
 // @route   POST /api/bookings
@@ -18,7 +19,8 @@ exports.createBooking = async (req, res) => {
       roomId,
       checkIn,
       checkOut,
-      voucherId
+      voucherId,
+      paymentMethod = 'zalopay' // Default payment method
     } = req.body;
 
     console.log("Parsing check-in and check-out dates...");
@@ -100,7 +102,8 @@ exports.createBooking = async (req, res) => {
       originalPrice,
       discountAmount,
       finalPrice,
-      status: 'pending'
+      status: 'pending',
+      paymentMethod
     });
 
     console.log("Populating booking details...");
@@ -125,6 +128,7 @@ exports.createBooking = async (req, res) => {
         ${usedVoucher ? `<li>Mã giảm giá: ${usedVoucher.code}</li>` : ''}
         ${discountAmount > 0 ? `<li>Giảm giá: ${discountAmount.toLocaleString()}đ</li>` : ''}
         <li>Tổng thanh toán: ${finalPrice.toLocaleString()}đ</li>
+        <li>Phương thức thanh toán: ${paymentMethod === 'zalopay' ? 'ZaloPay' : 'VNPay'}</li>
       </ul>
       <p>Trạng thái: Chờ xác nhận</p>
     `;
@@ -135,7 +139,15 @@ exports.createBooking = async (req, res) => {
       message
     });
 
-    const paymentUrl = await ZaloPayService.createPaymentUrl(booking);
+    // Lựa chọn cổng thanh toán
+    let paymentUrl;
+    if (paymentMethod === 'vnpay') {
+      console.log("Generating VNPay payment URL...");
+      paymentUrl = await VNPayService.createPaymentUrl(booking);
+    } else {
+      console.log("Generating ZaloPay payment URL...");
+      paymentUrl = await ZaloPayService.createPaymentUrl(booking);
+    }
     console.log("Payment URL generated:", paymentUrl);
 
     console.log("Booking created successfully:", booking._id);
@@ -156,18 +168,26 @@ exports.createBooking = async (req, res) => {
 // Phương thức xác nhận thanh toán
 exports.confirmPayment = async (req, res) => {
   try {
-    const paymentData = req.body;
-    const result = await ZaloPayService.verifyPayment(paymentData);
+    const { transactionId, paymentMethod = 'zalopay' } = req.body;
+    let result;
+    
+    if (paymentMethod === 'vnpay') {
+      result = await VNPayService.verifyPayment(transactionId);
+    } else {
+      result = await ZaloPayService.verifyPayment(transactionId);
+    }
 
-    if (result) {
+    if (result.success) {
       res.status(200).json({
         success: true,
-        message: 'Thanh toán thành công'
+        message: 'Thanh toán thành công',
+        data: result
       });
     } else {
       res.status(400).json({
         success: false,
-        message: 'Thanh toán không thành công'
+        message: 'Thanh toán không thành công',
+        data: result
       });
     }
   } catch (error) {
@@ -178,7 +198,6 @@ exports.confirmPayment = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Lấy danh sách booking của user
 // @route   GET /api/bookings

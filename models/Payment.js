@@ -10,21 +10,25 @@ const paymentSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  // ID giao dịch nội bộ (app_trans_id) - giữ nguyên tên trường để tương thích ngược
+  // ID giao dịch nội bộ (app_trans_id cho ZaloPay, vnp_TxnRef cho VNPay)
   transactionId: {
     type: String,
     required: true,
     unique: true
   },
-  // ID giao dịch từ ZaloPay (zp_trans_id)
+  // ID giao dịch từ cổng thanh toán
   zpTransId: {
+    type: String,
+    index: true
+  },
+  vpnTransId: {
     type: String,
     index: true
   },
   paymentMethod: {
     type: String,
     required: true,
-    enum: ['zalopay', 'credit_card', 'paypal'],
+    enum: ['zalopay', 'vnpay', 'credit_card', 'paypal'],
     default: 'zalopay'
   },
   status: {
@@ -37,6 +41,9 @@ const paymentSchema = new mongoose.Schema({
     type: String
   },
   zaloRefundId: {
+    type: String
+  },
+  vnpRefundId: {
     type: String
   },
   refundTimestamp: {
@@ -55,6 +62,7 @@ const paymentSchema = new mongoose.Schema({
 // Indexes
 paymentSchema.index({ bookingId: 1, status: 1 });
 paymentSchema.index({ zpTransId: 1 });
+paymentSchema.index({ vpnTransId: 1 });
 paymentSchema.index({ refundTransactionId: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);
