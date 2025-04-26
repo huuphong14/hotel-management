@@ -38,9 +38,10 @@ const upload = multer({
 // Public routes
 router.get('/', getHotels);
 router.get('/my-hotels', protect, authorize('partner'), getMyHotels);
+router.get('/discounts', getDiscountedHotels);
 router.get('/:id', getHotel);
 router.get('/location/:locationId', getHotelsByLocation);
-router.get('/discounts', getDiscountedHotels);
+
  
 // Protected routes
 router.use(protect);

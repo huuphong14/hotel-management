@@ -522,11 +522,9 @@ exports.updateFeaturedImage = async (req, res) => {
   }
 };
 
-// Thêm vào hotelController.js
 // @desc    Lấy danh sách khách sạn đang có giảm giá
 // @route   GET /api/hotels/discounts
 // @access  Public
-// Cập nhật hàm getDiscountedHotels trong hotelController.js
 exports.getDiscountedHotels = async (req, res) => {
   try {
     const {

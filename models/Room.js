@@ -11,6 +11,11 @@ const RoomSchema = new mongoose.Schema({
     required: [true, 'Vui lòng nhập tên phòng'],
     trim: true
   },
+  description: {
+    type: String,
+    required: [true, 'Vui lòng nhập mô tả phòng'],
+    trim: true
+  },
   floor: {
     type: Number,
     required: [true, 'Vui lòng chọn tầng'],

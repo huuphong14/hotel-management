@@ -26,18 +26,18 @@ exports.createRoom = async (req, res) => {
 
     // Kiểm tra và xử lý tiện ích phòng
     const amenities = req.body.amenities ? JSON.parse(req.body.amenities) : [];
-    
+
     // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
     if (amenities.length > 0) {
       const validAmenities = await Amenity.find({
         _id: { $in: amenities },
         type: "room"
       });
-      
+
       if (validAmenities.length !== amenities.length) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại" 
+          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại"
         });
       }
     }
@@ -212,7 +212,7 @@ exports.updateRoom = async (req, res) => {
     }
 
     // Xử lý dữ liệu cập nhật
-    const allowedFields = ['roomType', 'bedType', 'price', 'capacity', 'squareMeters', 'amenities', 'cancellationPolicy', 'status'];
+    const allowedFields = ['roomName', 'description', 'roomType', 'bedType', 'price', 'capacity', 'squareMeters', 'amenities', 'cancellationPolicy', 'status'];
     const updateData = {};
     Object.keys(req.body).forEach(key => {
       if (allowedFields.includes(key)) {
@@ -223,20 +223,20 @@ exports.updateRoom = async (req, res) => {
     // Xử lý amenities nếu có
     if (req.body.amenities) {
       const amenities = JSON.parse(req.body.amenities);
-      
+
       // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
       const validAmenities = await Amenity.find({
         _id: { $in: amenities },
         type: "room"
       });
-      
+
       if (validAmenities.length !== amenities.length) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
-          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại" 
+          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại"
         });
       }
-      
+
       updateData.amenities = amenities;
     }
 
@@ -381,7 +381,7 @@ exports.searchRooms = async (req, res) => {
     }
 
     // Bước 1: Tìm Location ID từ tên địa điểm
-    const location = await Location.findOne({ 
+    const location = await Location.findOne({
       name: { $regex: locationName, $options: 'i' },
       status: 'active'
     });
@@ -398,7 +398,7 @@ exports.searchRooms = async (req, res) => {
       locationId: location._id,
       status: 'active'
     };
-    
+
     if (hotelName) {
       hotelQuery.name = { $regex: hotelName, $options: 'i' };
     }
@@ -447,7 +447,7 @@ exports.searchRooms = async (req, res) => {
     // Tính toán giá sau giảm giá
     rooms = rooms.map(room => {
       const roomObj = room.toObject();
-      
+
       // Kiểm tra nếu có giảm giá đang áp dụng
       if (
         room.discountPercent > 0 &&
@@ -465,7 +465,7 @@ exports.searchRooms = async (req, res) => {
         roomObj.discountedPrice = room.price;
         roomObj.hasDiscount = false;
       }
-      
+
       return roomObj;
     });
 
