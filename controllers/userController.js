@@ -378,7 +378,7 @@ exports.getUser = asyncHandler(async (req, res) => {
 exports.updateUser = asyncHandler(async (req, res) => {
   // Lọc các trường được phép cập nhật
   const fieldsToUpdate = {};
-  const allowedFields = ['name', 'email', 'phone', 'role', 'isEmailVerified', 'address', 'preferences', 'active'];
+  const allowedFields = ['name', 'email', 'phone', 'role', 'isEmailVerified', 'address',];
   
   // Chỉ lấy các trường được phép
   Object.keys(req.body).forEach(key => {
@@ -473,6 +473,147 @@ exports.deleteUser = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Đã xóa người dùng'
+  });
+});
+// @desc    Vô hiệu hóa tài khoản người dùng bởi Admin
+// @route   PATCH /api/users/:id/deactivate
+// @access  Private (Admin)
+exports.deactivateUserByAdmin = asyncHandler(async (req, res) => {
+  const { reason } = req.body;
+  
+  if (!reason) {
+    return res.status(400).json({
+      success: false,
+      message: 'Vui lòng cung cấp lý do vô hiệu hóa tài khoản'
+    });
+  }
+
+  const user = await User.findById(req.params.id);
+  
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'Không tìm thấy người dùng'
+    });
+  }
+  
+  // Kiểm tra nếu tài khoản đã bị vô hiệu hóa
+  if (user.status !== 'active') {
+    return res.status(400).json({
+      success: false,
+      message: `Tài khoản này đã ${user.status === 'pending' ? 'đang chờ xác minh' : 'bị vô hiệu hóa'}`
+    });
+  }
+  
+  // Kiểm tra nếu là admin cuối cùng
+  if (user.role === 'admin') {
+    const adminCount = await User.countDocuments({ role: 'admin', status: 'active' });
+    if (adminCount <= 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể vô hiệu hóa admin cuối cùng'
+      });
+    }
+  }
+  
+  // Kiểm tra xem người dùng có phải là chủ khách sạn
+  if (user.role === 'partner') {
+    const hotels = await Hotel.find({ ownerId: user._id });
+    if (hotels.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không thể vô hiệu hóa tài khoản khi người dùng vẫn còn khách sạn. Vui lòng xóa hoặc chuyển quyền sở hữu khách sạn trước'
+      });
+    }
+  }
+  
+  // Kiểm tra xem người dùng có booking đang hoạt động không
+  const activeBookings = await Booking.find({
+    userId: user._id,
+    status: { $in: ['pending', 'confirmed', 'checked_in'] }
+  });
+  
+  if (activeBookings.length > 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'Không thể vô hiệu hóa tài khoản khi người dùng vẫn còn đặt phòng đang hoạt động'
+    });
+  }
+  
+  // Lưu thông tin vô hiệu hóa
+  user.status = 'rejected';
+  user.deactivationReason = reason;
+  user.deactivatedAt = Date.now();
+  await user.save({ validateBeforeSave: false });
+  
+  // Gửi email thông báo
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Tài khoản của bạn đã bị vô hiệu hóa',
+      message: `Tài khoản của bạn đã bị vô hiệu hóa vì lý do: ${reason}. Nếu bạn cho rằng đây là sự nhầm lẫn hoặc muốn kích hoạt lại tài khoản, vui lòng liên hệ với chúng tôi.`
+    });
+  } catch (err) {
+    console.error('Không thể gửi email thông báo vô hiệu hóa tài khoản', err);
+  }
+  
+  res.status(200).json({
+    success: true,
+    message: 'Đã vô hiệu hóa tài khoản người dùng',
+    data: {
+      userId: user._id,
+      status: user.status,
+      deactivationReason: user.deactivationReason,
+      deactivatedAt: user.deactivatedAt
+    }
+  });
+});
+
+// @desc    Kích hoạt lại tài khoản người dùng (admin only)
+// @route   PATCH /api/users/:id/activate
+// @access  Private (Admin)
+exports.activateUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+  
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'Không tìm thấy người dùng'
+    });
+  }
+  
+  // Kiểm tra nếu tài khoản đã được kích hoạt
+  if (user.status === 'active') {
+    return res.status(400).json({
+      success: false,
+      message: 'Tài khoản này đã được kích hoạt'
+    });
+  }
+  
+  // Kích hoạt lại tài khoản
+  user.status = 'active';
+  user.deactivationReason = undefined;
+  user.deactivatedAt = undefined;
+  await user.save({ validateBeforeSave: false });
+  
+  // Gửi email thông báo
+  try {
+    await sendEmail({
+      email: user.email,
+      subject: 'Tài khoản của bạn đã được kích hoạt lại',
+      message: 'Tài khoản của bạn đã được kích hoạt lại và bạn có thể đăng nhập vào hệ thống.'
+    });
+  } catch (err) {
+    console.error('Không thể gửi email thông báo kích hoạt lại tài khoản', err);
+  }
+  
+  res.status(200).json({
+    success: true,
+    message: 'Đã kích hoạt lại tài khoản người dùng',
+    data: {
+      userId: user._id,
+      status: user.status
+    }
   });
 });
 

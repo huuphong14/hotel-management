@@ -11,6 +11,39 @@ const bookingSchema = new mongoose.Schema({
     ref: 'Room',
     required: true
   },
+  // Contact Information
+  bookingFor: {
+    type: String,
+    enum: ['self', 'other'],
+    default: 'self'
+  },
+  contactInfo: {
+    name: {
+      type: String,
+      required: true
+    },
+    email: {
+      type: String,
+      required: true
+    },
+    phone: {
+      type: String,
+      required: true
+    }
+  },
+  // Guest information (when booking for someone else)
+  guestInfo: {
+    name: {
+      type: String
+    },
+    email: {
+      type: String
+    },
+    phone: {
+      type: String
+    }
+  },
+  // Dates
   checkIn: {
     type: Date,
     required: true
@@ -19,6 +52,22 @@ const bookingSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  // Special requests
+  specialRequests: {
+    earlyCheckIn: {
+      type: Boolean,
+      default: false
+    },
+    lateCheckOut: {
+      type: Boolean,
+      default: false
+    },
+    additionalRequests: {
+      type: String,
+      default: ''
+    }
+  },
+  // Financial information
   voucher: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Voucher'
@@ -35,6 +84,7 @@ const bookingSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  // Status fields
   status: {
     type: String,
     enum: ['pending', 'confirmed', 'cancelled', 'completed'],
@@ -43,8 +93,13 @@ const bookingSchema = new mongoose.Schema({
   paymentStatus: {
     type: String,
     default: 'pending'
+  },
+  cancelledAt: {
+    type: Date
+  },
+  cancellationReason: {
+    type: String
   }
-  
 }, {
   timestamps: true
 });
@@ -59,7 +114,13 @@ bookingSchema.pre('save', function(next) {
   if (this.checkOut <= this.checkIn) {
     next(new Error('Ngày trả phòng phải sau ngày nhận phòng'));
   }
+  
+  // Kiểm tra thông tin khách khi đặt hộ người khác
+  if (this.bookingFor === 'other' && (!this.guestInfo || !this.guestInfo.name)) {
+    next(new Error('Vui lòng cung cấp thông tin người lưu trú khi đặt phòng hộ'));
+  }
+  
   next();
 });
 
-module.exports = mongoose.model('Booking', bookingSchema); 
+module.exports = mongoose.model('Booking', bookingSchema);

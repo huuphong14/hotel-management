@@ -10,7 +10,6 @@ const VNPayService = require('../services/vnPayService');
 // @desc    Tạo booking mới
 // @route   POST /api/bookings
 // @access  Private
-
 exports.createBooking = async (req, res) => {
   try {
     console.log("Received booking request:", req.body);
@@ -20,8 +19,29 @@ exports.createBooking = async (req, res) => {
       checkIn,
       checkOut,
       voucherId,
-      paymentMethod = 'zalopay' // Default payment method
+      paymentMethod = 'zalopay', // Default payment method
+      // New fields for contact information
+      bookingFor = 'self', // 'self' or 'other'
+      contactInfo = {}, // name, email, phone of booking person
+      guestInfo = {}, // name, email, phone of guest (if bookingFor === 'other')
+      specialRequests = {} // earlyCheckIn, lateCheckOut, additionalRequests
     } = req.body;
+
+    // Validate contact information
+    if (!contactInfo.name || !contactInfo.email || !contactInfo.phone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp đầy đủ thông tin liên hệ'
+      });
+    }
+
+    // Validate guest information if booking for someone else
+    if (bookingFor === 'other' && (!guestInfo.name || !guestInfo.phone)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp tên và số điện thoại của người lưu trú'
+      });
+    }
 
     console.log("Parsing check-in and check-out dates...");
     const checkInDate = new Date(checkIn);
@@ -96,6 +116,12 @@ exports.createBooking = async (req, res) => {
     const booking = await Booking.create({
       user: req.user.id,
       room: roomId,
+      // Add new contact and request details
+      bookingFor,
+      contactInfo,
+      guestInfo: bookingFor === 'other' ? guestInfo : undefined,
+      specialRequests,
+      // Existing fields
       checkIn: checkInDate,
       checkOut: checkOutDate,
       voucher: usedVoucher ? usedVoucher._id : null,
@@ -115,6 +141,7 @@ exports.createBooking = async (req, res) => {
     await NotificationService.createBookingNotification(booking);
 
     console.log("Sending confirmation email...");
+    // Enhanced email message with contact information and special requests
     const message = `
       <h1>Xác nhận đặt phòng</h1>
       <p>Thông tin đặt phòng:</p>
@@ -130,11 +157,38 @@ exports.createBooking = async (req, res) => {
         <li>Tổng thanh toán: ${finalPrice.toLocaleString()}đ</li>
         <li>Phương thức thanh toán: ${paymentMethod === 'zalopay' ? 'ZaloPay' : 'VNPay'}</li>
       </ul>
+      
+      <h2>Thông tin liên hệ:</h2>
+      <ul>
+        <li>Tên người đặt: ${contactInfo.name}</li>
+        <li>Email: ${contactInfo.email}</li>
+        <li>Số điện thoại: ${contactInfo.phone}</li>
+      </ul>
+      
+      ${bookingFor === 'other' ? `
+        <h2>Thông tin người lưu trú:</h2>
+        <ul>
+          <li>Tên: ${guestInfo.name}</li>
+          <li>Email: ${guestInfo.email || 'Không có'}</li>
+          <li>Số điện thoại: ${guestInfo.phone}</li>
+        </ul>
+      ` : ''}
+      
+      ${
+        (specialRequests.earlyCheckIn || specialRequests.lateCheckOut || specialRequests.additionalRequests) ?
+        `<h2>Yêu cầu đặc biệt:</h2>
+        <ul>
+          ${specialRequests.earlyCheckIn ? '<li>Yêu cầu check-in sớm</li>' : ''}
+          ${specialRequests.lateCheckOut ? '<li>Yêu cầu check-out muộn</li>' : ''}
+          ${specialRequests.additionalRequests ? `<li>Yêu cầu khác: ${specialRequests.additionalRequests}</li>` : ''}
+        </ul>` : ''
+      }
+      
       <p>Trạng thái: Chờ xác nhận</p>
     `;
 
     await sendEmail({
-      email: req.user.email,
+      email: contactInfo.email, // Send to the contact email provided
       subject: 'Xác nhận đặt phòng',
       message
     });
@@ -204,8 +258,8 @@ exports.confirmPayment = async (req, res) => {
 // @access  Private
 exports.getMyBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ userId: req.user.id })
-      .populate('roomId')
+    const bookings = await Booking.find({ user: req.user.id })
+      .populate('room')
       .sort('-createdAt');
 
     res.status(200).json({
@@ -219,7 +273,6 @@ exports.getMyBookings = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Cập nhật trạng thái booking
 // @route   PUT /api/bookings/:id/status
@@ -250,7 +303,7 @@ exports.updateBookingStatus = async (req, res) => {
 
     // Cập nhật trạng thái phòng nếu cần
     if (status === 'cancelled' || status === 'completed') {
-      const room = await Room.findById(booking.roomId);
+      const room = await Room.findById(booking.room);
       room.status = 'available';
       await room.save();
     }
@@ -391,7 +444,6 @@ exports.zaloPayReturn = async (req, res) => {
     res.redirect('/payment-error');
   }
 };
-
 
 // Cập nhật phương thức cancelBooking để sử dụng các tính năng mới
 exports.cancelBooking = async (req, res) => {
