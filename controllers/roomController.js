@@ -2,6 +2,7 @@ const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
 const Booking = require('../models/Booking');
 const Location = require('../models/Location');
+const Amenity = require('../models/Amenity');
 const cloudinaryService = require('../config/cloudinaryService');
 const { updateHotelLowestPrice } = require('../utils/hotelHelpers');
 
@@ -137,9 +138,8 @@ exports.getRooms = async (req, res) => {
 
     // Filter theo trạng thái
     if (available === 'true') {
-      query.isAvailable = true;
+      query.status = 'available';
     }
-
     // Tính toán pagination
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -212,7 +212,13 @@ exports.updateRoom = async (req, res) => {
     }
 
     // Xử lý dữ liệu cập nhật
-    const allowedFields = ['roomName', 'description', 'roomType', 'bedType', 'price', 'capacity', 'squareMeters', 'amenities', 'cancellationPolicy', 'status'];
+    const allowedFields = [
+      'roomName', 'description', 'floor', 'roomType', 'bedType', 
+      'price', 'capacity', 'squareMeters', 'amenities', 
+      'cancellationPolicy', 'status', 'discountPercent', 
+      'discountStartDate', 'discountEndDate'
+    ];
+    
     const updateData = {};
     Object.keys(req.body).forEach(key => {
       if (allowedFields.includes(key)) {
@@ -220,39 +226,98 @@ exports.updateRoom = async (req, res) => {
       }
     });
 
+    // Chuyển đổi các trường số nếu có
+    if (updateData.price) updateData.price = Number(updateData.price);
+    if (updateData.capacity) updateData.capacity = Number(updateData.capacity);
+    if (updateData.squareMeters) updateData.squareMeters = Number(updateData.squareMeters);
+    if (updateData.floor) updateData.floor = Number(updateData.floor);
+    if (updateData.discountPercent) updateData.discountPercent = Number(updateData.discountPercent);
+
+    // Xử lý các ngày giảm giá nếu có
+    if (updateData.discountStartDate) {
+      updateData.discountStartDate = new Date(updateData.discountStartDate);
+    }
+    if (updateData.discountEndDate) {
+      updateData.discountEndDate = new Date(updateData.discountEndDate);
+    }
+
+    // Kiểm tra nếu có yêu cầu xóa giảm giá
+    if (req.body.removeDiscount === 'true') {
+      updateData.discountPercent = 0;
+      updateData.discountStartDate = null;
+      updateData.discountEndDate = null;
+    }
+
     // Xử lý amenities nếu có
     if (req.body.amenities) {
-      const amenities = JSON.parse(req.body.amenities);
+      try {
+        const amenities = JSON.parse(req.body.amenities);
 
-      // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
-      const validAmenities = await Amenity.find({
-        _id: { $in: amenities },
-        type: "room"
-      });
+        // Kiểm tra xem tất cả các tiện ích đều tồn tại và thuộc loại "room"
+        const validAmenities = await Amenity.find({
+          _id: { $in: amenities },
+          type: "room"
+        });
 
-      if (validAmenities.length !== amenities.length) {
+        if (validAmenities.length !== amenities.length) {
+          return res.status(400).json({
+            success: false,
+            message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại"
+          });
+        }
+
+        updateData.amenities = amenities;
+      } catch (error) {
         return res.status(400).json({
           success: false,
-          message: "Một số tiện ích phòng không hợp lệ hoặc không tồn tại"
+          message: "Định dạng tiện ích không hợp lệ",
+          error: error.message
         });
       }
-
-      updateData.amenities = amenities;
     }
 
     // Xử lý hình ảnh
     if (req.files && req.files.length > 0) {
-      // Upload ảnh mới
-      const newImages = await cloudinaryService.uploadManyFromBuffer(req.files, 'rooms');
+      try {
+        // Upload ảnh mới
+        const newImages = await cloudinaryService.uploadManyFromBuffer(req.files, 'rooms');
 
-      // Xóa ảnh cũ trên Cloudinary nếu có
-      if (room.images && room.images.length > 0) {
-        const publicIds = room.images.map(img => img.publicId);
-        await cloudinaryService.deleteMany(publicIds);
+        // Xóa ảnh cũ trên Cloudinary nếu có
+        if (room.images && room.images.length > 0) {
+          const publicIds = room.images.map(img => img.publicId).filter(id => id);
+          if (publicIds.length > 0) {
+            await cloudinaryService.deleteMany(publicIds);
+          }
+        }
+
+        // Gán ảnh mới vào updateData
+        updateData.images = newImages;
+      } catch (error) {
+        console.error('Lỗi xử lý hình ảnh:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xử lý hình ảnh',
+          error: error.message
+        });
       }
-
-      // Gán ảnh mới vào updateData
-      updateData.images = newImages;
+    } else if (req.body.removeImages === 'true') {
+      // Nếu người dùng muốn xóa tất cả hình ảnh mà không thêm hình ảnh mới
+      try {
+        if (room.images && room.images.length > 0) {
+          const publicIds = room.images.map(img => img.publicId).filter(id => id);
+          if (publicIds.length > 0) {
+            await cloudinaryService.deleteMany(publicIds);
+          }
+        }
+        updateData.images = [];
+      } catch (error) {
+        console.error('Lỗi khi xóa hình ảnh:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa hình ảnh',
+          error: error.message
+        });
+      }
     }
 
     // Cập nhật phòng
@@ -265,7 +330,12 @@ exports.updateRoom = async (req, res) => {
       select: 'name address'
     });
 
-    await updateHotelLowestPrice(req.params.hotelId);
+    try {
+      await updateHotelLowestPrice(room.hotelId);
+    } catch (error) {
+      console.error('Lỗi khi cập nhật giá thấp nhất của khách sạn:', error);
+      // Không trả về lỗi cho người dùng vì phòng vẫn được cập nhật thành công
+    }
 
     res.status(200).json({
       success: true,
@@ -326,9 +396,15 @@ exports.deleteRoom = async (req, res) => {
       });
     }
 
+    // Xóa hình ảnh trên Cloudinary nếu có
+    if (room.images && room.images.length > 0) {
+      const publicIds = room.images.map(img => img.publicId);
+      await cloudinaryService.deleteMany(publicIds);
+    }
+
     await room.deleteOne();
 
-    await updateHotelLowestPrice(req.params.hotelId);
+    await updateHotelLowestPrice(room.hotelId);
 
     res.status(200).json({
       success: true,
@@ -344,8 +420,7 @@ exports.deleteRoom = async (req, res) => {
   }
 };
 
-// Cập nhật hàm searchRooms để bao gồm thông tin giảm giá
-// @desc    Tìm kiếm phòng khách sạn theo địa điểm, ngày và số người
+// @desc    Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người
 // @route   GET /api/rooms/search
 // @access  Public
 exports.searchRooms = async (req, res) => {
@@ -363,7 +438,6 @@ exports.searchRooms = async (req, res) => {
       limit = 10
     } = req.query;
 
-    // Validate dữ liệu đầu vào
     if (!locationName || !checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
@@ -380,7 +454,6 @@ exports.searchRooms = async (req, res) => {
       });
     }
 
-    // Bước 1: Tìm Location ID từ tên địa điểm
     const location = await Location.findOne({
       name: { $regex: locationName, $options: 'i' },
       status: 'active'
@@ -393,7 +466,6 @@ exports.searchRooms = async (req, res) => {
       });
     }
 
-    // Bước 2: Tìm khách sạn theo locationId
     const hotelQuery = {
       locationId: location._id,
       status: 'active'
@@ -404,7 +476,7 @@ exports.searchRooms = async (req, res) => {
     }
 
     const hotels = await Hotel.find(hotelQuery).select('_id');
-    const hotelIds = hotels.map(hotel => hotel._id);
+    const hotelIds = hotels.map(h => h._id);
 
     if (hotelIds.length === 0) {
       return res.status(404).json({
@@ -413,7 +485,6 @@ exports.searchRooms = async (req, res) => {
       });
     }
 
-    // Lấy danh sách phòng đã được đặt
     const bookedRooms = await Booking.find({
       $or: [
         { checkIn: { $lte: checkOutDate }, checkOut: { $gte: checkInDate } }
@@ -421,9 +492,8 @@ exports.searchRooms = async (req, res) => {
       status: { $in: ['pending', 'confirmed'] }
     }).select('roomId');
 
-    const bookedRoomIds = bookedRooms.map(booking => booking.roomId);
+    const bookedRoomIds = bookedRooms.map(b => b.roomId).filter(Boolean);
 
-    // Xây dựng query cho phòng
     const roomQuery = {
       hotelId: { $in: hotelIds },
       capacity: { $gte: Number(capacity) },
@@ -431,45 +501,34 @@ exports.searchRooms = async (req, res) => {
       status: 'available'
     };
 
-    // Ngày hiện tại để tính giảm giá
     const currentDate = new Date();
 
-    // Tính toán phân trang
-    const skip = (Number(page) - 1) * Number(limit);
-
-    // Thực hiện query
     let rooms = await Room.find(roomQuery)
       .populate({
         path: 'hotelId',
-        select: 'name address rating images'
+        select: 'name address rating images featuredImage policies lowestPrice lowestDiscountedPrice highestDiscountPercent'
       });
 
-    // Tính toán giá sau giảm giá
     rooms = rooms.map(room => {
       const roomObj = room.toObject();
 
-      // Kiểm tra nếu có giảm giá đang áp dụng
       if (
         room.discountPercent > 0 &&
         room.discountStartDate && room.discountEndDate &&
         currentDate >= room.discountStartDate &&
         currentDate <= room.discountEndDate
       ) {
-        roomObj.originalPrice = room.price;
+        roomObj.discountedPrice = Math.round(room.price * (1 - room.discountPercent / 100));
         roomObj.discountPercent = room.discountPercent;
-        roomObj.discountedPrice = room.price * (1 - room.discountPercent / 100);
-        roomObj.discountEndDate = room.discountEndDate;
-        roomObj.hasDiscount = true;
       } else {
-        roomObj.originalPrice = room.price;
         roomObj.discountedPrice = room.price;
-        roomObj.hasDiscount = false;
+        roomObj.discountPercent = 0;
       }
 
       return roomObj;
     });
 
-    // Lọc theo khoảng giá (nếu có)
+    // Lọc theo khoảng giá nếu có
     if (minPrice || maxPrice) {
       rooms = rooms.filter(room => {
         const price = room.discountedPrice;
@@ -479,34 +538,56 @@ exports.searchRooms = async (req, res) => {
       });
     }
 
-    // Sắp xếp
-    if (sort === 'price') {
-      rooms.sort((a, b) => a.discountedPrice - b.discountedPrice);
-    } else if (sort === '-price') {
-      rooms.sort((a, b) => b.discountedPrice - a.discountedPrice);
-    } else if (sort === 'rating') {
-      rooms.sort((a, b) => a.hotelId.rating - b.hotelId.rating);
+    // Gom khách sạn
+    const hotelMap = new Map();
+    rooms.forEach(room => {
+      const hotel = room.hotelId;
+      if (!hotelMap.has(hotel._id.toString())) {
+        hotelMap.set(hotel._id.toString(), {
+          _id: hotel._id,
+          name: hotel.name,
+          address: hotel.address,
+          rating: hotel.rating,
+          images: hotel.images,
+          featuredImage: hotel.featuredImage,
+          policies: hotel.policies,
+          lowestPrice: hotel.lowestPrice,
+          lowestDiscountedPrice: hotel.lowestDiscountedPrice,
+          highestDiscountPercent: hotel.highestDiscountPercent
+        });
+      }
+    });
+
+    let hotelsWithAvailableRooms = Array.from(hotelMap.values());
+
+    // Sắp xếp khách sạn
+    if (sort === 'rating') {
+      hotelsWithAvailableRooms.sort((a, b) => a.rating - b.rating);
     } else if (sort === '-rating') {
-      rooms.sort((a, b) => b.hotelId.rating - a.hotelId.rating);
+      hotelsWithAvailableRooms.sort((a, b) => b.rating - a.rating);
+    } else if (sort === 'price') {
+      hotelsWithAvailableRooms.sort((a, b) => a.lowestDiscountedPrice - b.lowestDiscountedPrice);
+    } else if (sort === '-price') {
+      hotelsWithAvailableRooms.sort((a, b) => b.lowestDiscountedPrice - a.lowestDiscountedPrice);
     } else if (sort === 'discountPercent') {
-      rooms.sort((a, b) => (a.discountPercent || 0) - (b.discountPercent || 0));
+      hotelsWithAvailableRooms.sort((a, b) => a.highestDiscountPercent - b.highestDiscountPercent);
     } else if (sort === '-discountPercent') {
-      rooms.sort((a, b) => (b.discountPercent || 0) - (a.discountPercent || 0));
+      hotelsWithAvailableRooms.sort((a, b) => b.highestDiscountPercent - a.highestDiscountPercent);
     }
 
-    // Áp dụng phân trang sau khi lọc và sắp xếp
-    const total = rooms.length;
-    rooms = rooms.slice(skip, skip + Number(limit));
+    const total = hotelsWithAvailableRooms.length;
+    const skip = (Number(page) - 1) * Number(limit);
+    hotelsWithAvailableRooms = hotelsWithAvailableRooms.slice(skip, skip + Number(limit));
 
     res.status(200).json({
       success: true,
-      count: rooms.length,
+      count: hotelsWithAvailableRooms.length,
       total,
       pagination: {
         currentPage: Number(page),
         totalPages: Math.ceil(total / Number(limit))
       },
-      data: rooms
+      data: hotelsWithAvailableRooms
     });
   } catch (error) {
     console.error('Chi tiết lỗi:', error);
@@ -517,6 +598,7 @@ exports.searchRooms = async (req, res) => {
     });
   }
 };
+
 
 // @desc    Cài đặt giảm giá cho phòng
 // @route   PUT /api/rooms/:id/discount

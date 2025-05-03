@@ -8,16 +8,21 @@ const {
   confirmPayment,
   checkPaymentStatus,
   zaloPayReturn,
-  zaloPayCallback
+  zaloPayCallback,
+  vnPayReturn,
+  vnPayCallback,
+  checkVNPayRefundStatus
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 
 const router = express.Router();
 
-
+// Public routes for payment callbacks
 router.post('/zalopay-callback', zaloPayCallback);
 router.get('/zalopay-return', zaloPayReturn);
+router.post('/vnpay-callback', vnPayCallback);
+router.get('/vnpay-return', vnPayReturn);
 
 router.use(protect);
 
@@ -27,6 +32,8 @@ router.post('/', createBooking);
 router.post('/confirm-payment', confirmPayment);
 router.get('/my-bookings', getMyBookings);
 router.patch('/:id/cancel', cancelBooking);
+router.get('/payment-status/:transactionId', checkPaymentStatus);
+router.get('/vnpay-refund-status/:transactionId', checkVNPayRefundStatus);
 
 // Admin/Partner routes
 router.patch(
@@ -35,8 +42,6 @@ router.patch(
   updateBookingStatus
 );
 
-
-router.get('/payment-status/:transactionId',checkPaymentStatus);
 // Trong router của bạn
 router.get('/refund-status/:transactionId', async (req, res) => {
   try {
@@ -76,33 +81,39 @@ router.get('/refund-status/:transactionId', async (req, res) => {
       }
     };
     
-    // Nếu đang xử lý hoàn tiền, kiểm tra lại với ZaloPay
+    // Nếu đang xử lý hoàn tiền, kiểm tra lại với cổng thanh toán tương ứng
     if (payment.status === 'refunding') {
-      // Tương tự như code ở mục 2
-      const timestamp = Date.now();
-      const queryData = {
-        app_id: ZaloPayService.config.appId,
-        m_refund_id: payment.refundTransactionId,
-        timestamp: timestamp
-      };
-      
-      const dataStr = `${queryData.app_id}|${queryData.m_refund_id}|${queryData.timestamp}`;
-      queryData.mac = crypto
-        .createHmac('sha256', ZaloPayService.config.key1)
-        .update(dataStr)
-        .digest('hex');
-      
-      const response = await axios.post(`${ZaloPayService.config.endpoint}/query_refund`, null, {
-        params: queryData,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-      
-      statusResponse.zaloPayResponse = {
-        return_code: response.data.return_code,
-        return_message: response.data.return_message,
-        status: response.data.return_code === 1 ? 'completed' : 
-               response.data.return_code === 3 ? 'processing' : 'failed'
-      };
+      if (payment.paymentMethod === 'zalopay') {
+        // Kiểm tra với ZaloPay
+        const timestamp = Date.now();
+        const queryData = {
+          app_id: ZaloPayService.config.appId,
+          m_refund_id: payment.refundTransactionId,
+          timestamp: timestamp
+        };
+        
+        const dataStr = `${queryData.app_id}|${queryData.m_refund_id}|${queryData.timestamp}`;
+        queryData.mac = crypto
+          .createHmac('sha256', ZaloPayService.config.key1)
+          .update(dataStr)
+          .digest('hex');
+        
+        const response = await axios.post(`${ZaloPayService.config.endpoint}/query_refund`, null, {
+          params: queryData,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        
+        statusResponse.zaloPayResponse = {
+          return_code: response.data.return_code,
+          return_message: response.data.return_message,
+          status: response.data.return_code === 1 ? 'completed' : 
+                 response.data.return_code === 3 ? 'processing' : 'failed'
+        };
+      } else if (payment.paymentMethod === 'vnpay') {
+        // Kiểm tra với VNPay
+        const refundStatus = await VNPayService.checkRefundStatus(payment.refundTransactionId);
+        statusResponse.vnPayResponse = refundStatus;
+      }
     }
     
     return res.json(statusResponse);
@@ -115,4 +126,5 @@ router.get('/refund-status/:transactionId', async (req, res) => {
     });
   }
 });
+
 module.exports = router;

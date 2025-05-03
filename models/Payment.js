@@ -54,6 +54,40 @@ const paymentSchema = new mongoose.Schema({
   },
   refundFailReason: {
     type: String
+  },
+  // Thêm các trường cho VNPay
+  vnpResponseCode: {
+    type: String
+  },
+  vnpResponseMessage: {
+    type: String
+  },
+  vnpPayDate: {
+    type: String
+  },
+  vnpBankCode: {
+    type: String
+  },
+  vnpCardType: {
+    type: String
+  },
+  vnpOrderInfo: {
+    type: String
+  },
+  vnpTransactionType: {
+    type: String
+  },
+  vnpTransactionStatus: {
+    type: String
+  },
+  vnpTxnRef: {
+    type: String
+  },
+  vnpSecureHash: {
+    type: String
+  },
+  vnpSecureHashType: {
+    type: String
   }
 }, {
   timestamps: true
@@ -64,5 +98,6 @@ paymentSchema.index({ bookingId: 1, status: 1 });
 paymentSchema.index({ zpTransId: 1 });
 paymentSchema.index({ vpnTransId: 1 });
 paymentSchema.index({ refundTransactionId: 1 });
+paymentSchema.index({ vnpTxnRef: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

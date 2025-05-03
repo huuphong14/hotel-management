@@ -10,7 +10,9 @@ const {
   getUser,
   updateUser,
   deleteUser,
-  getUserStats
+  getUserStatus,
+  deactivateUserByAdmin,
+  activateUser  
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -42,16 +44,17 @@ router.use(protect);
 router.get('/me', getMe);
 router.put('/me', updateMe);
 router.patch('/me/avatar', upload.single('avatar'), uploadAvatar);
-router.patch('/me/settings/password', changePassword);
-router.patch('/me/settings/notifications', updateNotificationSettings);
-router.delete('/me', deactivateAccount);
-
+router.patch('/me/change-password', changePassword);
+router.patch('/me/notifications', updateNotificationSettings);
+router.patch('/me/deactivate', deactivateAccount);
 // Admin routes
 router.use(authorize('admin'));
 router.get('/', getUsers);
-router.get('/status', getUserStats);
+router.get('/status', getUserStatus);
 router.get('/:id', getUser);
 router.put('/:id', updateUser);
 router.delete('/:id', deleteUser);
+router.patch('/:id/deactivate', deactivateUserByAdmin);
+router.patch('/:id/activate', activateUser);
 
 module.exports = router;

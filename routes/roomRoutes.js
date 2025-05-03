@@ -32,7 +32,7 @@ router.get('/:id', getRoom); // Xem chi tiết một phòng
 // Protected routes - Cần đăng nhập và phân quyền
 router.use(protect);
 router.post('/hotels/:hotelId/rooms', authorize('partner'),upload.array('images', 10), createRoom);
-router.put('/:id', protect, authorize('partner'), upload.array('images', 10), updateRoom);
+router.put('/:id', authorize('partner'), upload.array('images', 10), updateRoom);
 router.delete('/:id', authorize('partner'), deleteRoom);
 
 router.put('/:id/discount', authorize('partner'), setRoomDiscount);

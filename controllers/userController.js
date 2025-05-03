@@ -132,10 +132,10 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
 });
 
 // @desc    Đổi mật khẩu
-// @route   PUT /api/users/change-password
+// @route   PATCH /api/users/me/change-password
 // @access  Private
 exports.changePassword = asyncHandler(async (req, res) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body;
+  const { currentPassword, newPassword, confirmPassword, logoutAllDevices } = req.body;
   
   // Kiểm tra các trường
   if (!currentPassword || !newPassword || !confirmPassword) {
@@ -161,8 +161,24 @@ exports.changePassword = asyncHandler(async (req, res) => {
     });
   }
   
-  // Lấy thông tin người dùng (bao gồm password)
-  const user = await User.findById(req.user.id).select('+password');
+  // Kiểm tra mật khẩu mới khác mật khẩu cũ
+  if (newPassword === currentPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại'
+    });
+  }
+  
+  // Lấy thông tin người dùng (bao gồm password và refreshToken)
+  const user = await User.findById(req.user.id).select('+password +refreshToken');
+  
+  // Kiểm tra nếu không tìm thấy người dùng
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: 'Không tìm thấy người dùng'
+    });
+  }
   
   // Kiểm tra mật khẩu hiện tại
   const isMatch = await user.matchPassword(currentPassword);
@@ -175,20 +191,27 @@ exports.changePassword = asyncHandler(async (req, res) => {
   
   // Cập nhật mật khẩu mới
   user.password = newPassword;
+  
+  // Nếu người dùng muốn đăng xuất khỏi tất cả các thiết bị khác
+  if (logoutAllDevices) {
+    user.refreshToken = undefined;
+  }
+  
   await user.save();
   
   res.status(200).json({
     success: true,
-    message: 'Đổi mật khẩu thành công'
+    message: 'Đổi mật khẩu thành công',
+    loggedOutAllDevices: !!logoutAllDevices
   });
 });
 
 // @desc    Vô hiệu hóa tài khoản (soft delete)
-// @route   DELETE /api/users/me
+// @route   PATCH /api/users/me/deactivate
 // @access  Private
 exports.deactivateAccount = asyncHandler(async (req, res) => {
   // Kiểm tra mật khẩu
-  const { password } = req.body;
+  const { password, reason } = req.body;
   
   if (!password) {
     return res.status(400).json({
@@ -209,8 +232,8 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
     });
   }
   
-  // Kiểm tra xem người dùng có phải là chủ khách sạn
-  if (user.role === 'hotel_owner') {
+  // Kiểm tra xem người dùng có phải là chủ khách sạn (partner)
+  if (user.role === 'partner') {
     const hotels = await Hotel.find({ ownerId: user._id });
     if (hotels.length > 0) {
       return res.status(400).json({
@@ -233,8 +256,8 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
     });
   }
   
-  // Vô hiệu hóa tài khoản
-  user.active = false;
+  // Vô hiệu hóa tài khoản (cập nhật trạng thái)
+  user.status = 'rejected';
   await user.save({ validateBeforeSave: false });
   
   // Gửi mail thông báo
@@ -256,7 +279,13 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
   
   res.status(200).json({
     success: true,
-    message: 'Tài khoản đã bị vô hiệu hóa'
+    message: 'Tài khoản đã bị vô hiệu hóa',
+    data: {
+      userId: user._id,
+      status: user.status,
+      deactivationReason: user.deactivationReason,
+      deactivatedAt: user.deactivatedAt
+    }
   });
 });
 
@@ -620,7 +649,7 @@ exports.activateUser = asyncHandler(async (req, res) => {
 // @desc    Lấy thống kê người dùng (admin only)
 // @route   GET /api/users/stats
 // @access  Private (Admin)
-exports.getUserStats = asyncHandler(async (req, res) => {
+exports.getUserStatus = asyncHandler(async (req, res) => {
   // Thống kê theo role
   const roleStats = await User.aggregate([
     { $group: { _id: '$role', count: { $sum: 1 } } }

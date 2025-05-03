@@ -163,7 +163,7 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Thông tin đăng nhập không chính xác mk'
+        message: 'Thông tin đăng nhập không chính xác'
       });
     }
 

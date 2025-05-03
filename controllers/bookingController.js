@@ -6,6 +6,7 @@ const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
 const ZaloPayService = require('../services/zaloPayService')
 const VNPayService = require('../services/vnPayService');
+const Payment = require('../models/Payment');
 
 // @desc    Tạo booking mới
 // @route   POST /api/bookings
@@ -445,6 +446,77 @@ exports.zaloPayReturn = async (req, res) => {
   }
 };
 
+// @desc    Xử lý khi người dùng quay lại từ VNPay
+// @route   GET /api/bookings/vnpay-return
+// @access  Public
+exports.vnPayReturn = async (req, res) => {
+  try {
+    console.log("User returned from VNPay payment:", req.query);
+    await VNPayService.handleCallback(req, res);
+  } catch (error) {
+    console.error("VNPay return processing error:", error);
+    res.redirect('/payment-error');
+  }
+};
+
+// @desc    Xử lý callback từ VNPay
+// @route   POST /api/bookings/vnpay-callback
+// @access  Public
+exports.vnPayCallback = async (req, res) => {
+  try {
+    console.log("Received VNPay callback:", req.body);
+    await VNPayService.handleCallback(req, res);
+  } catch (error) {
+    console.error("VNPay callback processing error:", error);
+    res.status(500).json({
+      return_code: -1,
+      return_message: 'Lỗi xử lý callback'
+    });
+  }
+};
+
+// @desc    Kiểm tra trạng thái hoàn tiền VNPay
+// @route   GET /api/bookings/vnpay-refund-status/:transactionId
+// @access  Private
+exports.checkVNPayRefundStatus = async (req, res) => {
+  try {
+    const { transactionId } = req.params;
+    
+    // Tìm giao dịch thanh toán
+    const payment = await Payment.findOne({ transactionId });
+    
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy giao dịch'
+      });
+    }
+    
+    // Kiểm tra trạng thái hoàn tiền
+    if (!payment.refundTransactionId) {
+      return res.json({
+        success: false,
+        message: 'Chưa có yêu cầu hoàn tiền cho giao dịch này',
+        payment: {
+          transactionId: payment.transactionId,
+          status: payment.status
+        }
+      });
+    }
+    
+    // Kiểm tra trạng thái hoàn tiền
+    const refundStatus = await VNPayService.checkRefundStatus(payment.refundTransactionId);
+    
+    return res.json(refundStatus);
+  } catch (error) {
+    console.error('Lỗi kiểm tra trạng thái hoàn tiền:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi kiểm tra trạng thái hoàn tiền'
+    });
+  }
+};
+
 // Cập nhật phương thức cancelBooking để sử dụng các tính năng mới
 exports.cancelBooking = async (req, res) => {
   try {
@@ -509,7 +581,21 @@ exports.cancelBooking = async (req, res) => {
       console.log(`Booking ${booking._id} đã được thanh toán, tiến hành hoàn tiền`);
       
       try {
-        const refundResult = await ZaloPayService.refundPayment(booking);
+        let refundResult = false;
+        
+        // Xử lý hoàn tiền dựa trên phương thức thanh toán
+        if (booking.paymentMethod === 'zalopay') {
+          refundResult = await ZaloPayService.refundPayment(booking);
+        } else if (booking.paymentMethod === 'vnpay') {
+          refundResult = await VNPayService.refundPayment(booking);
+        } else {
+          console.error(`Không hỗ trợ hoàn tiền cho phương thức thanh toán: ${booking.paymentMethod}`);
+          return res.status(400).json({
+            success: false,
+            message: 'Không hỗ trợ hoàn tiền cho phương thức thanh toán này'
+          });
+        }
+        
         console.log(`Kết quả hoàn tiền: ${refundResult ? 'Thành công' : 'Thất bại'}`);
 
         if (!refundResult) {
@@ -519,7 +605,7 @@ exports.cancelBooking = async (req, res) => {
           });
         }
         
-        // ZaloPayService.refundPayment đã cập nhật trạng thái booking
+        // Các service đã cập nhật trạng thái booking
         res.status(200).json({
           success: true,
           message: 'Hủy booking và hoàn tiền thành công'
