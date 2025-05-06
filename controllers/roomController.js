@@ -281,17 +281,29 @@ exports.updateRoom = async (req, res) => {
       try {
         // Upload ảnh mới
         const newImages = await cloudinaryService.uploadManyFromBuffer(req.files, 'rooms');
-
-        // Xóa ảnh cũ trên Cloudinary nếu có
-        if (room.images && room.images.length > 0) {
-          const publicIds = room.images.map(img => img.publicId).filter(id => id);
-          if (publicIds.length > 0) {
-            await cloudinaryService.deleteMany(publicIds);
+        
+        // Kiểm tra hành động với ảnh
+        const imageAction = req.body.imageAction || 'add'; // Mặc định là thêm ảnh
+        
+        if (imageAction === 'replace') {
+          // Thay thế: Xóa tất cả ảnh cũ và chỉ sử dụng ảnh mới
+          if (room.images && room.images.length > 0) {
+            const publicIds = room.images
+              .map(img => img.publicId)
+              .filter(id => id && id.trim() !== '');
+            
+            if (publicIds.length > 0) {
+              console.log('Đang xóa ảnh cũ với publicIds:', publicIds);
+              await cloudinaryService.deleteMany(publicIds);
+            }
           }
+          updateData.images = newImages;
+        } else {
+          // Thêm: Giữ ảnh cũ và thêm ảnh mới
+          updateData.images = [...(room.images || []), ...newImages];
         }
-
-        // Gán ảnh mới vào updateData
-        updateData.images = newImages;
+        
+        console.log(`Đã ${imageAction === 'replace' ? 'thay thế' : 'thêm'} ${newImages.length} ảnh mới`);
       } catch (error) {
         console.error('Lỗi xử lý hình ảnh:', error);
         return res.status(500).json({
@@ -304,8 +316,12 @@ exports.updateRoom = async (req, res) => {
       // Nếu người dùng muốn xóa tất cả hình ảnh mà không thêm hình ảnh mới
       try {
         if (room.images && room.images.length > 0) {
-          const publicIds = room.images.map(img => img.publicId).filter(id => id);
+          const publicIds = room.images
+            .map(img => img.publicId)
+            .filter(id => id && id.trim() !== '');
+          
           if (publicIds.length > 0) {
+            console.log('Đang xóa tất cả ảnh với publicIds:', publicIds);
             await cloudinaryService.deleteMany(publicIds);
           }
         }
@@ -315,6 +331,42 @@ exports.updateRoom = async (req, res) => {
         return res.status(500).json({
           success: false,
           message: 'Lỗi khi xóa hình ảnh',
+          error: error.message
+        });
+      }
+    } else if (req.body.removeImageIds) {
+      // Nếu người dùng muốn xóa một số ảnh cụ thể
+      try {
+        let removeIds;
+        try {
+          removeIds = JSON.parse(req.body.removeImageIds);
+        } catch (e) {
+          removeIds = req.body.removeImageIds.split(',').map(id => id.trim());
+        }
+        
+        if (removeIds && removeIds.length > 0) {
+          // Lọc ra các publicId cần xóa
+          const publicIdsToRemove = room.images
+            .filter(img => removeIds.includes(img._id.toString()) || removeIds.includes(img.publicId))
+            .map(img => img.publicId)
+            .filter(id => id && id.trim() !== '');
+          
+          // Xóa ảnh trên Cloudinary
+          if (publicIdsToRemove.length > 0) {
+            console.log('Đang xóa ảnh cụ thể với publicIds:', publicIdsToRemove);
+            await cloudinaryService.deleteMany(publicIdsToRemove);
+          }
+          
+          // Cập nhật lại mảng images
+          updateData.images = room.images.filter(img => 
+            !removeIds.includes(img._id.toString()) && !removeIds.includes(img.publicId)
+          );
+        }
+      } catch (error) {
+        console.error('Lỗi khi xóa ảnh cụ thể:', error);
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa ảnh cụ thể',
           error: error.message
         });
       }

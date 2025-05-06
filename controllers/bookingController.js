@@ -44,20 +44,48 @@ exports.createBooking = async (req, res) => {
       });
     }
 
+    function isValidCheckInDate(checkInDate) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Đặt giờ về 00:00:00
+
+      const checkInDateOnly = new Date(checkInDate);
+      checkInDateOnly.setHours(0, 0, 0, 0); // Đặt giờ về 00:00:00
+
+      return checkInDateOnly >= today;
+    }
+
     console.log("Parsing check-in and check-out dates...");
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
 
-    if (checkInDate < new Date()) {
+    // Đặt giờ cố định là 14:00 (giờ check-in tiêu chuẩn) theo giờ địa phương
+    checkInDate.setHours(14, 0, 0, 0);
+    checkOutDate.setHours(12, 0, 0, 0); // check-out tiêu chuẩn là 12:00
+
+    // Kiểm tra ngày check-in
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset giờ về 00:00:00
+
+    if (checkInDate < today) {
       console.warn("Invalid check-in date:", checkInDate);
       return res.status(400).json({
         success: false,
-        message: 'Ngày check-in không hợp lệ'
+        message: 'Ngày check-in không hợp lệ, vui lòng chọn từ ngày hôm nay trở đi'
+      });
+    }
+
+    // Kiểm tra ngày check-out phải sau ngày check-in
+    if (checkOutDate <= checkInDate) {
+      console.warn("Invalid check-out date:", checkOutDate);
+      return res.status(400).json({
+        success: false,
+        message: 'Ngày check-out phải sau ngày check-in'
       });
     }
 
     console.log("Fetching room details for roomId:", roomId);
-    const room = await Room.findById(roomId);
+    // Đảm bảo lấy thông tin chi tiết của phòng và thông tin khách sạn liên quan
+    const room = await Room.findById(roomId).populate('hotelId');
     if (!room) {
       console.warn("Room not found:", roomId);
       return res.status(404).json({
@@ -141,14 +169,17 @@ exports.createBooking = async (req, res) => {
     console.log("Creating booking notification...");
     await NotificationService.createBookingNotification(booking);
 
+    // Lấy tên khách sạn từ thông tin phòng đã populate
+    const hotelName = room.hotelId ? room.hotelId.name : 'Khách sạn';
+
     console.log("Sending confirmation email...");
     // Enhanced email message with contact information and special requests
     const message = `
       <h1>Xác nhận đặt phòng</h1>
       <p>Thông tin đặt phòng:</p>
       <ul>
-        <li>Tên phòng: ${room.name || 'Không xác định'}</li>
-        <li>Loại phòng: ${room.type || 'Không xác định'}</li>
+        <li>Khách sạn: ${hotelName}</li>
+        <li>Loại phòng: ${room.roomType}</li>
         <li>Ngày check-in: ${checkIn}</li>
         <li>Ngày check-out: ${checkOut}</li>
         <li>Số đêm: ${numberOfDays}</li>
@@ -175,8 +206,7 @@ exports.createBooking = async (req, res) => {
         </ul>
       ` : ''}
       
-      ${
-        (specialRequests.earlyCheckIn || specialRequests.lateCheckOut || specialRequests.additionalRequests) ?
+      ${(specialRequests.earlyCheckIn || specialRequests.lateCheckOut || specialRequests.additionalRequests) ?
         `<h2>Yêu cầu đặc biệt:</h2>
         <ul>
           ${specialRequests.earlyCheckIn ? '<li>Yêu cầu check-in sớm</li>' : ''}
@@ -225,7 +255,7 @@ exports.confirmPayment = async (req, res) => {
   try {
     const { transactionId, paymentMethod = 'zalopay' } = req.body;
     let result;
-    
+
     if (paymentMethod === 'vnpay') {
       result = await VNPayService.verifyPayment(transactionId);
     } else {
@@ -344,7 +374,7 @@ exports.checkVoucher = async (req, res) => {
     const originalPrice = room.price * numberOfDays;
 
     // Kiểm tra voucher
-    const voucher = await Voucher.findOne({ 
+    const voucher = await Voucher.findOne({
       code: voucherCode.toUpperCase(),
       status: 'active',
       type: 'room' // Chỉ lấy voucher cho phòng
@@ -392,19 +422,26 @@ exports.checkVoucher = async (req, res) => {
 
 // Hàm kiểm tra phòng có sẵn
 async function checkRoomAvailability(roomId, checkIn, checkOut) {
+  // Đảm bảo đã đặt giờ check-in và check-out
+  const checkInTime = new Date(checkIn);
+  checkInTime.setHours(14, 0, 0, 0);  // check-in 14:00
+  
+  const checkOutTime = new Date(checkOut);
+  checkOutTime.setHours(12, 0, 0, 0);  // check-out 12:00
+  
   const existingBooking = await Booking.findOne({
     room: roomId,
     status: { $ne: 'cancelled' },
     $or: [
       {
-        checkIn: { $lte: checkOut },
-        checkOut: { $gte: checkIn }
+        checkIn: { $lt: checkOutTime },
+        checkOut: { $gt: checkInTime }
       }
     ]
   });
 
   return !existingBooking;
-} 
+}
 
 // Kiểm tra trạng thái thanh toán
 exports.checkPaymentStatus = async (req, res) => {
@@ -481,17 +518,17 @@ exports.vnPayCallback = async (req, res) => {
 exports.checkVNPayRefundStatus = async (req, res) => {
   try {
     const { transactionId } = req.params;
-    
+
     // Tìm giao dịch thanh toán
     const payment = await Payment.findOne({ transactionId });
-    
+
     if (!payment) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy giao dịch'
       });
     }
-    
+
     // Kiểm tra trạng thái hoàn tiền
     if (!payment.refundTransactionId) {
       return res.json({
@@ -503,10 +540,10 @@ exports.checkVNPayRefundStatus = async (req, res) => {
         }
       });
     }
-    
+
     // Kiểm tra trạng thái hoàn tiền
     const refundStatus = await VNPayService.checkRefundStatus(payment.refundTransactionId);
-    
+
     return res.json(refundStatus);
   } catch (error) {
     console.error('Lỗi kiểm tra trạng thái hoàn tiền:', error);
@@ -522,7 +559,7 @@ exports.cancelBooking = async (req, res) => {
   try {
     console.log(`=== BẮT ĐẦU HỦY BOOKING ${req.params.id} ===`);
     console.log(`Người dùng ${req.user.id} yêu cầu hủy booking ${req.params.id}`);
-    
+
     const booking = await Booking.findById(req.params.id);
 
     if (!booking) {
@@ -579,10 +616,10 @@ exports.cancelBooking = async (req, res) => {
     // Xử lý theo trạng thái thanh toán
     if (booking.paymentStatus === 'paid') {
       console.log(`Booking ${booking._id} đã được thanh toán, tiến hành hoàn tiền`);
-      
+
       try {
         let refundResult = false;
-        
+
         // Xử lý hoàn tiền dựa trên phương thức thanh toán
         if (booking.paymentMethod === 'zalopay') {
           refundResult = await ZaloPayService.refundPayment(booking);
@@ -595,7 +632,7 @@ exports.cancelBooking = async (req, res) => {
             message: 'Không hỗ trợ hoàn tiền cho phương thức thanh toán này'
           });
         }
-        
+
         console.log(`Kết quả hoàn tiền: ${refundResult ? 'Thành công' : 'Thất bại'}`);
 
         if (!refundResult) {
@@ -604,7 +641,7 @@ exports.cancelBooking = async (req, res) => {
             message: 'Không thể hoàn tiền, vui lòng liên hệ hỗ trợ'
           });
         }
-        
+
         // Các service đã cập nhật trạng thái booking
         res.status(200).json({
           success: true,
@@ -620,14 +657,14 @@ exports.cancelBooking = async (req, res) => {
     } else {
       // Nếu chưa thanh toán, chỉ cần cập nhật trạng thái
       console.log(`Booking ${booking._id} chưa thanh toán, chỉ cập nhật trạng thái`);
-      
+
       booking.status = 'cancelled';
       booking.cancelledAt = new Date();
       booking.cancellationReason = 'user_requested';
       await booking.save();
-      
+
       console.log(`Đã cập nhật booking ${booking._id} thành trạng thái 'cancelled'`);
-      
+
       // Gửi thông báo hủy
       await NotificationService.createNotification({
         user: booking.user,
@@ -637,15 +674,15 @@ exports.cancelBooking = async (req, res) => {
         relatedModel: 'Booking',
         relatedId: booking._id
       });
-      
+
       console.log(`Đã gửi thông báo hủy booking cho người dùng ${booking.user}`);
-      
+
       res.status(200).json({
         success: true,
         message: 'Hủy booking thành công'
       });
     }
-    
+
     console.log(`=== KẾT THÚC HỦY BOOKING ${req.params.id} ===`);
   } catch (error) {
     console.error(`Lỗi hủy booking: ${error.message}`);
