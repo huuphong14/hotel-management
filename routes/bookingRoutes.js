@@ -11,7 +11,11 @@ const {
   zaloPayCallback,
   vnPayReturn,
   vnPayCallback,
-  checkVNPayRefundStatus
+  checkVNPayRefundStatus,
+  getBookingDetails,
+  getHotelBookings,
+  getAllBookings,
+  getMyHotelBookings
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -25,6 +29,7 @@ router.post('/vnpay-callback', vnPayCallback);
 router.get('/vnpay-return', vnPayReturn);
 
 router.use(protect);
+router.get('/my-hotels', authorize('partner'), getMyHotelBookings);
 
 // User routes
 router.post('/check-voucher', checkVoucher);
@@ -35,12 +40,7 @@ router.patch('/:id/cancel', cancelBooking);
 router.get('/payment-status/:transactionId', checkPaymentStatus);
 router.get('/vnpay-refund-status/:transactionId', checkVNPayRefundStatus);
 
-// Admin/Partner routes
-router.patch(
-  '/:id/status',
-  authorize('admin', 'partner'),
-  updateBookingStatus
-);
+
 
 // Trong router của bạn
 router.get('/refund-status/:transactionId', async (req, res) => {
@@ -126,5 +126,26 @@ router.get('/refund-status/:transactionId', async (req, res) => {
     });
   }
 });
+router.get('/:id', getBookingDetails);
+
+// Admin/Partner routes
+router.patch(
+  '/:id/status',
+  authorize('admin', 'partner'),
+  updateBookingStatus
+);
+
+router.get(
+  '/hotel/:hotelId',
+  authorize('admin', 'partner'),
+  getHotelBookings
+);
+
+
+router.get(
+  '/admin/all',
+  authorize('admin'),
+  getAllBookings
+);
 
 module.exports = router;

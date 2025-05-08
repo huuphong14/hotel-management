@@ -6,11 +6,6 @@ const RoomSchema = new mongoose.Schema({
     ref: 'Hotel',
     required: [true, 'Vui lòng chọn khách sạn']
   },
-  roomName: {
-    type: String,
-    required: [true, 'Vui lòng nhập tên phòng'],
-    trim: true
-  },
   description: {
     type: String,
     required: [true, 'Vui lòng nhập mô tả phòng'],

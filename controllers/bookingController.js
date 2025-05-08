@@ -1,12 +1,14 @@
 const Booking = require('../models/Booking');
 const Room = require('../models/Room');
 const User = require('../models/User');
+const Hotel = require('../models/Hotel'); 
 const Voucher = require('../models/Voucher');
 const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
 const ZaloPayService = require('../services/zaloPayService')
 const VNPayService = require('../services/vnPayService');
 const Payment = require('../models/Payment');
+const mongoose = require('mongoose'); 
 
 // @desc    Tạo booking mới
 // @route   POST /api/bookings
@@ -117,16 +119,8 @@ exports.createBooking = async (req, res) => {
       const voucher = await Voucher.findOne({
         _id: voucherId,
         status: 'active',
-        type: 'room'
+        //startDate: { $lte: now } 
       });
-
-      if (!voucher || !voucher.isValid(originalPrice)) {
-        console.warn("Invalid or inapplicable voucher:", voucherId);
-        return res.status(400).json({
-          success: false,
-          message: 'Voucher không hợp lệ'
-        });
-      }
 
       discountAmount = voucher.calculateDiscount(originalPrice);
       finalPrice = originalPrice - discountAmount;
@@ -356,24 +350,32 @@ exports.updateBookingStatus = async (req, res) => {
 // @access  Private
 exports.checkVoucher = async (req, res) => {
   try {
+    console.log("=== BẮT ĐẦU KIỂM TRA VOUCHER ===");
     const { roomId, checkIn, checkOut, voucherCode } = req.body;
+    console.log(`Thông tin yêu cầu: roomId=${roomId}, checkIn=${checkIn}, checkOut=${checkOut}, voucherCode=${voucherCode}`);
 
     // Kiểm tra phòng
+    console.log(`Tìm thông tin phòng với ID: ${roomId}`);
     const room = await Room.findById(roomId).populate('hotel');
     if (!room) {
+      console.log(`Không tìm thấy phòng với ID ${roomId}`);
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy phòng'
       });
     }
+    console.log(`Tìm thấy phòng: ${room.roomType}, giá: ${room.price}đ/đêm`);
 
     // Tính giá gốc
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
     const numberOfDays = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    console.log(`Số ngày lưu trú: ${numberOfDays}`);
     const originalPrice = room.price * numberOfDays;
+    console.log(`Giá gốc đặt phòng: ${originalPrice}đ`);
 
     // Kiểm tra voucher
+    console.log(`Tìm voucher với mã: ${voucherCode.toUpperCase()}`);
     const voucher = await Voucher.findOne({
       code: voucherCode.toUpperCase(),
       status: 'active',
@@ -381,22 +383,64 @@ exports.checkVoucher = async (req, res) => {
     });
 
     if (!voucher) {
+      console.log(`Không tìm thấy voucher với mã ${voucherCode.toUpperCase()} hoặc voucher không hoạt động/không áp dụng cho phòng`);
       return res.status(400).json({
         success: false,
         message: 'Mã voucher không hợp lệ'
       });
     }
 
-    if (!voucher.isValid(originalPrice)) {
+    console.log(`Tìm thấy voucher: ${JSON.stringify({
+      code: voucher.code,
+      discount: voucher.discount,
+      type: voucher.discountType,
+      minOrderValue: voucher.minOrderValue,
+      expiryDate: voucher.expiryDate,
+      usageCount: voucher.usageCount,
+      usageLimit: voucher.usageLimit
+    })}`);
+
+    // Kiểm tra chi tiết tính hợp lệ của voucher
+    console.log(`Kiểm tra tính hợp lệ của voucher...`);
+    
+    // Kiểm tra hạn sử dụng
+    const now = new Date();
+    if (voucher.expiryDate && new Date(voucher.expiryDate) < now) {
+      console.log(`Voucher đã hết hạn. Hạn sử dụng: ${voucher.expiryDate}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Voucher đã hết hạn sử dụng'
+      });
+    }
+    
+    // Kiểm tra giới hạn sử dụng
+    if (voucher.usageLimit && voucher.usageCount >= voucher.usageLimit) {
+      console.log(`Voucher đã đạt giới hạn sử dụng. Đã sử dụng: ${voucher.usageCount}/${voucher.usageLimit}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Voucher đã đạt giới hạn sử dụng'
+      });
+    }
+
+    // Kiểm tra giá trị đơn hàng tối thiểu
+    const isValidForPrice = voucher.isValid(originalPrice);
+    console.log(`Kiểm tra giá trị đơn tối thiểu: ${isValidForPrice ? 'Đạt' : 'Không đạt'}`);
+    console.log(`Giá trị đơn: ${originalPrice}đ, Giá trị tối thiểu yêu cầu: ${voucher.minOrderValue}đ`);
+    
+    if (!isValidForPrice) {
       return res.status(400).json({
         success: false,
         message: `Không thể áp dụng voucher này. Giá trị đơn tối thiểu: ${voucher.minOrderValue}đ`
       });
     }
 
+    // Tính toán giảm giá
     const discountAmount = voucher.calculateDiscount(originalPrice);
+    console.log(`Giảm giá: ${discountAmount}đ (${voucher.discountType === 'percentage' ? voucher.discount + '%' : voucher.discount + 'đ'})`);
     const finalPrice = originalPrice - discountAmount;
+    console.log(`Giá cuối cùng sau khi áp dụng voucher: ${finalPrice}đ`);
 
+    console.log("=== KẾT THÚC KIỂM TRA VOUCHER - THÀNH CÔNG ===");
     res.status(200).json({
       success: true,
       data: {
@@ -413,6 +457,8 @@ exports.checkVoucher = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error(`=== LỖI KIỂM TRA VOUCHER: ${error.message} ===`);
+    console.error(error.stack);
     res.status(500).json({
       success: false,
       message: 'Lỗi server'
@@ -690,6 +736,567 @@ exports.cancelBooking = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi server khi hủy booking'
+    });
+  }
+};
+// @desc    Lấy toàn bộ booking của một khách sạn
+// @route   GET /api/bookings/hotel/:hotelId
+// @access  Private (Admin/Hotel Owner)
+exports.getHotelBookings = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const { status, startDate, endDate, sort = '-createdAt', page = 1, limit = 10 } = req.query;
+    
+    console.log(`Fetching bookings for hotel ${hotelId}`);
+    console.log(`Query params: status=${status}, startDate=${startDate}, endDate=${endDate}, sort=${sort}, page=${page}, limit=${limit}`);
+    
+    // Xác thực quyền truy cập (chỉ admin hoặc chủ khách sạn)
+    if (req.user.role !== 'admin' && req.user.role !== 'hotel_owner') {
+      console.log(`User ${req.user.id} with role ${req.user.role} not authorized to view hotel bookings`);
+      return res.status(403).json({
+        success: false,
+        message: 'Không có quyền truy cập danh sách đặt phòng của khách sạn'
+      });
+    }
+    
+    // Nếu là chủ khách sạn, cần kiểm tra xem họ có sở hữu khách sạn này không
+    if (req.user.role === 'hotel_owner') {
+      // Lấy danh sách khách sạn thuộc quyền sở hữu của user
+      const hotels = await Hotel.find({ owner: req.user.id }).select('_id');
+      const hotelIds = hotels.map(hotel => hotel._id.toString());
+      
+      if (!hotelIds.includes(hotelId)) {
+        console.log(`Hotel owner ${req.user.id} doesn't own hotel ${hotelId}`);
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn không có quyền xem đặt phòng của khách sạn này'
+        });
+      }
+    }
+    
+    // Tạo query để lấy phòng thuộc về khách sạn
+    const rooms = await Room.find({ hotelId }).select('_id');
+    const roomIds = rooms.map(room => room._id);
+    
+    console.log(`Found ${roomIds.length} rooms for hotel ${hotelId}`);
+    
+    // Khởi tạo điều kiện lọc
+    const query = { room: { $in: roomIds } };
+    
+    // Áp dụng bộ lọc theo trạng thái nếu có
+    if (status && ['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+      query.status = status;
+    }
+    
+    // Áp dụng bộ lọc theo thời gian
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        query.$or = [
+          { 
+            checkIn: { $gte: start, $lte: end } 
+          },
+          { 
+            checkOut: { $gte: start, $lte: end } 
+          },
+          {
+            $and: [
+              { checkIn: { $lte: start } },
+              { checkOut: { $gte: end } }
+            ]
+          }
+        ];
+      }
+    }
+    
+    console.log(`Applying query filters: ${JSON.stringify(query)}`);
+    
+    // Tính tổng số booking phù hợp với bộ lọc
+    const total = await Booking.countDocuments(query);
+    
+    // Thiết lập phân trang
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const startIndex = (pageNum - 1) * limitNum;
+    
+    // Thực hiện truy vấn với phân trang và sắp xếp
+    const bookings = await Booking.find(query)
+      .populate([
+        { path: 'user', select: 'name email' },
+        { path: 'room', select: 'roomType roomNumber price' },
+        { path: 'voucher', select: 'code discount discountType' },
+        { path: 'paymentId', select: 'amount transactionId status method' }
+      ])
+      .sort(sort)
+      .skip(startIndex)
+      .limit(limitNum);
+    
+    console.log(`Found ${bookings.length} bookings for hotel ${hotelId}`);
+    
+    // Thông tin phân trang
+    const pagination = {
+      total,
+      currentPage: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    };
+    
+    res.status(200).json({
+      success: true,
+      pagination,
+      data: bookings
+    });
+  } catch (error) {
+    console.error(`Error fetching hotel bookings: ${error.message}`);
+    console.error(error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách đặt phòng của khách sạn'
+    });
+  }
+};
+
+// @desc    Lấy toàn bộ booking trong hệ thống (cho admin)
+// @route   GET /api/bookings/all
+// @access  Private (Admin only)
+exports.getAllBookings = async (req, res) => {
+  try {
+    const { 
+      status,
+      paymentStatus,
+      startDate, 
+      endDate, 
+      hotelId,
+      userId,
+      paymentMethod,
+      sort = '-createdAt', 
+      page = 1, 
+      limit = 20 
+    } = req.query;
+    
+    console.log(`Admin ${req.user.id} fetching all bookings`);
+    console.log(`Query params: status=${status}, startDate=${startDate}, endDate=${endDate}, hotelId=${hotelId}, paymentStatus=${paymentStatus}, paymentMethod=${paymentMethod}, userId=${userId}`);
+    
+    // Chỉ admin mới có quyền truy cập
+    if (req.user.role !== 'admin') {
+      console.log(`User ${req.user.id} with role ${req.user.role} not authorized to view all bookings`);
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ admin mới có quyền truy cập tất cả đặt phòng'
+      });
+    }
+    
+    // Khởi tạo điều kiện lọc
+    const query = {};
+    
+    // Áp dụng các bộ lọc
+    if (status && ['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+      query.status = status;
+    }
+    
+    if (paymentStatus && ['pending', 'paid', 'failed', 'refunded'].includes(paymentStatus)) {
+      query.paymentStatus = paymentStatus;
+    }
+    
+    if (paymentMethod && ['zalopay', 'vnpay', 'credit_card', 'paypal'].includes(paymentMethod)) {
+      query.paymentMethod = paymentMethod;
+    }
+    
+    if (userId) {
+      try {
+        query.user = mongoose.Types.ObjectId(userId);
+      } catch (err) {
+        console.warn(`Invalid userId format: ${userId}`);
+      }
+    }
+    
+    // Lọc theo thời gian
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        query.$or = [
+          { 
+            checkIn: { $gte: start, $lte: end } 
+          },
+          { 
+            checkOut: { $gte: start, $lte: end } 
+          },
+          {
+            $and: [
+              { checkIn: { $lte: start } },
+              { checkOut: { $gte: end } }
+            ]
+          }
+        ];
+      }
+    }
+    
+    // Lọc theo khách sạn (cần join với bảng Room)
+    let roomIds = [];
+    if (hotelId) {
+      try {
+        const rooms = await Room.find({ hotelId: mongoose.Types.ObjectId(hotelId) }).select('_id');
+        roomIds = rooms.map(room => room._id);
+        if (roomIds.length > 0) {
+          query.room = { $in: roomIds };
+        }
+      } catch (err) {
+        console.warn(`Invalid hotelId format or no rooms found: ${hotelId}`);
+      }
+    }
+    
+    console.log(`Applying query filters: ${JSON.stringify(query)}`);
+    
+    // Tính tổng số booking phù hợp với bộ lọc
+    const total = await Booking.countDocuments(query);
+    
+    // Thiết lập phân trang
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const startIndex = (pageNum - 1) * limitNum;
+    
+    // Thực hiện truy vấn với phân trang và sắp xếp
+    const bookings = await Booking.find(query)
+      .populate([
+        { 
+          path: 'user', 
+          select: 'name email phone' 
+        },
+        { 
+          path: 'room', 
+          select: 'roomType roomNumber price hotelId', 
+          populate: { 
+            path: 'hotelId', 
+            select: 'name address city' 
+          } 
+        },
+        { 
+          path: 'voucher', 
+          select: 'code discount discountType expiryDate' 
+        },
+        { 
+          path: 'paymentId', 
+          select: 'amount transactionId status method createdAt updatedAt' 
+        }
+      ])
+      .sort(sort)
+      .skip(startIndex)
+      .limit(limitNum);
+    
+    console.log(`Found ${bookings.length} bookings matching criteria`);
+    
+    // Tính toán thống kê nhanh
+    const stats = {
+      totalBookings: total,
+      totalRevenue: await Booking.aggregate([
+        { $match: { ...query, paymentStatus: 'paid' } },
+        { $group: { _id: null, total: { $sum: '$finalPrice' } } }
+      ]).then(result => result.length > 0 ? result[0].total : 0),
+      statusCounts: await Booking.aggregate([
+        { $match: query },
+        { $group: { _id: '$status', count: { $sum: 1 } } }
+      ]).then(result => result.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {})),
+      paymentMethodCounts: await Booking.aggregate([
+        { $match: query },
+        { $group: { _id: '$paymentMethod', count: { $sum: 1 } } }
+      ]).then(result => result.reduce((acc, curr) => {
+        acc[curr._id] = curr.count;
+        return acc;
+      }, {}))
+    };
+    
+    // Thông tin phân trang
+    const pagination = {
+      total,
+      currentPage: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    };
+    
+    res.status(200).json({
+      success: true,
+      pagination,
+      stats,
+      data: bookings
+    });
+  } catch (error) {
+    console.error(`Error fetching all bookings: ${error.message}`);
+    console.error(error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách đặt phòng'
+    });
+  }
+};
+
+// @desc    Lấy chi tiết một booking
+// @route   GET /api/bookings/:id
+// @access  Private (User/Admin/Hotel Owner)
+exports.getBookingDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`Fetching details for booking ${id}`);
+    
+    const booking = await Booking.findById(id)
+      .populate([
+        { 
+          path: 'user', 
+          select: 'name email phone' 
+        },
+        { 
+          path: 'room', 
+          select: 'roomType roomNumber price amenities hotelId images', 
+          populate: { 
+            path: 'hotelId', 
+            select: 'name address city images rating' 
+          } 
+        },
+        { 
+          path: 'voucher', 
+          select: 'code discount discountType expiryDate' 
+        },
+        { 
+          path: 'paymentId', 
+          select: 'amount transactionId status method createdAt updatedAt' 
+        }
+      ]);
+    
+    if (!booking) {
+      console.log(`Booking ${id} not found`);
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy đặt phòng'
+      });
+    }
+    
+    // Kiểm tra quyền truy cập
+    const isOwner = booking.user && booking.user._id.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+    const isHotelOwner = req.user.role === 'hotel_owner';
+    
+    // Kiểm tra nếu là chủ khách sạn thì có sở hữu khách sạn chứa phòng này không
+    let hasHotelOwnerAccess = false;
+    if (isHotelOwner && booking.room && booking.room.hotelId) {
+      const hotels = await Hotel.find({ owner: req.user.id }).select('_id');
+      const hotelIds = hotels.map(hotel => hotel._id.toString());
+      hasHotelOwnerAccess = hotelIds.includes(booking.room.hotelId._id.toString());
+    }
+    
+    if (!isOwner && !isAdmin && !hasHotelOwnerAccess) {
+      console.log(`User ${req.user.id} not authorized to view booking ${id}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Không có quyền truy cập thông tin đặt phòng này'
+      });
+    }
+    
+    console.log(`Successfully fetched booking ${id}`);
+    
+    res.status(200).json({
+      success: true,
+      data: booking
+    });
+  } catch (error) {
+    console.error(`Error fetching booking details: ${error.message}`);
+    console.error(error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy thông tin đặt phòng'
+    });
+  }
+};
+// @desc    Lấy danh sách booking của khách sạn của chủ khách sạn đang đăng nhập
+// @route   GET /api/bookings/my-hotels
+// @access  Private (Hotel Owner)
+exports.getMyHotelBookings = async (req, res) => {
+  try {
+    const { 
+      status, 
+      startDate, 
+      endDate, 
+      sort = '-createdAt', 
+      page = 1, 
+      limit = 10,
+      hotelId
+    } = req.query;
+    
+    console.log(`Hotel owner ${req.user.id} fetching their hotel bookings`);
+    console.log(`Query params: status=${status}, startDate=${startDate}, endDate=${endDate}, sort=${sort}, page=${page}, limit=${limit}, hotelId=${hotelId}`);
+    
+    
+    // Tìm tất cả khách sạn thuộc sở hữu của chủ khách sạn đang đăng nhập
+    let hotelIds = [];
+    
+    if (hotelId) {
+      // Nếu hotelId được chỉ định, kiểm tra xem người dùng có sở hữu khách sạn đó không
+      const hotel = await Hotel.findOne({
+        _id: hotelId,
+        owner: req.user.id
+      });
+      
+      if (!hotel) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn không sở hữu khách sạn này hoặc khách sạn không tồn tại'
+        });
+      }
+      
+      hotelIds.push(hotel._id);
+    } else {
+      // Nếu không có hotelId, lấy tất cả khách sạn của chủ
+      const hotels = await Hotel.find({ owner: req.user.id }).select('_id');
+      hotelIds = hotels.map(hotel => hotel._id);
+    }
+    
+    if (hotelIds.length === 0) {
+      console.log(`Hotel owner ${req.user.id} doesn't own any hotels`);
+      return res.status(200).json({
+        success: true,
+        message: 'Bạn chưa có khách sạn nào',
+        pagination: {
+          total: 0,
+          currentPage: parseInt(page, 10),
+          limit: parseInt(limit, 10),
+          totalPages: 0
+        },
+        data: []
+      });
+    }
+    
+    console.log(`Found ${hotelIds.length} hotels owned by user ${req.user.id}`);
+    
+    // Tìm tất cả phòng thuộc về các khách sạn này
+    const rooms = await Room.find({ hotelId: { $in: hotelIds } }).select('_id hotelId');
+    const roomIds = rooms.map(room => room._id);
+    
+    console.log(`Found ${roomIds.length} rooms in these hotels`);
+    
+    if (roomIds.length === 0) {
+      console.log(`No rooms found in the hotels owned by user ${req.user.id}`);
+      return res.status(200).json({
+        success: true,
+        message: 'Khách sạn của bạn chưa có phòng nào',
+        pagination: {
+          total: 0,
+          currentPage: parseInt(page, 10),
+          limit: parseInt(limit, 10),
+          totalPages: 0
+        },
+        data: []
+      });
+    }
+    
+    // Xây dựng query để lọc booking
+    const query = { room: { $in: roomIds } };
+    
+    // Áp dụng các bộ lọc (nếu có)
+    if (status && ['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+      query.status = status;
+    }
+    
+    // Áp dụng bộ lọc theo thời gian
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+        query.$or = [
+          { 
+            checkIn: { $gte: start, $lte: end } 
+          },
+          { 
+            checkOut: { $gte: start, $lte: end } 
+          },
+          {
+            $and: [
+              { checkIn: { $lte: start } },
+              { checkOut: { $gte: end } }
+            ]
+          }
+        ];
+      }
+    }
+    
+    console.log(`Applying query filters: ${JSON.stringify(query)}`);
+    
+    // Tính tổng số booking phù hợp với bộ lọc
+    const total = await Booking.countDocuments(query);
+    
+    // Thiết lập phân trang
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const startIndex = (pageNum - 1) * limitNum;
+    
+    // Thực hiện truy vấn với phân trang và sắp xếp
+    const bookings = await Booking.find(query)
+      .populate([
+        { 
+          path: 'user', 
+          select: 'name email phone' 
+        },
+        { 
+          path: 'room', 
+          select: 'roomType roomNumber price hotelId', 
+          populate: {
+            path: 'hotelId',
+            select: 'name address city'
+          }
+        },
+        { 
+          path: 'voucher', 
+          select: 'code discount discountType' 
+        },
+        { 
+          path: 'paymentId', 
+          select: 'amount transactionId status method' 
+        }
+      ])
+      .sort(sort)
+      .skip(startIndex)
+      .limit(limitNum);
+    
+    console.log(`Found ${bookings.length} bookings for hotels owned by user ${req.user.id}`);
+    
+    // Thống kê nhanh
+    const stats = {
+      totalBookings: total,
+      pendingBookings: await Booking.countDocuments({ ...query, status: 'pending' }),
+      confirmedBookings: await Booking.countDocuments({ ...query, status: 'confirmed' }),
+      cancelledBookings: await Booking.countDocuments({ ...query, status: 'cancelled' }),
+      completedBookings: await Booking.countDocuments({ ...query, status: 'completed' }),
+      totalRevenue: await Booking.aggregate([
+        { $match: { ...query, status: { $in: ['confirmed', 'completed'] } } },
+        { $group: { _id: null, total: { $sum: '$finalPrice' } } }
+      ]).then(result => result.length > 0 ? result[0].total : 0)
+    };
+    
+    // Thông tin phân trang
+    const pagination = {
+      total,
+      currentPage: pageNum,
+      limit: limitNum,
+      totalPages: Math.ceil(total / limitNum)
+    };
+    
+    res.status(200).json({
+      success: true,
+      pagination,
+      stats,
+      data: bookings
+    });
+  } catch (error) {
+    console.error(`Error fetching hotel owner bookings: ${error.message}`);
+    console.error(error.stack);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách đặt phòng của khách sạn'
     });
   }
 };

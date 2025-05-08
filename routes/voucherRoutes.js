@@ -24,4 +24,4 @@ router.route('/')
 router.route('/:id')
   .put(updateVoucher);
 
-module.exports = router; 
+module.exports = router;
