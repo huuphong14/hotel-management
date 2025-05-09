@@ -12,9 +12,9 @@ exports.createVoucher = async (req, res) => {
       discount,
       startDate,
       expiryDate,
+      status,
       usageLimit,
       minOrderValue,
-      type,
       discountType,
       maxDiscount
     } = req.body;
@@ -29,16 +29,16 @@ exports.createVoucher = async (req, res) => {
     }
 
     // Kiểm tra các trường bắt buộc
-    if (!type || !discountType) {
+    if (!code || !discount || !expiryDate || !discountType) {
       return res.status(400).json({
         success: false,
-        message: 'Thiếu các trường bắt buộc (type, discountType)'
+        message: 'Thiếu các trường bắt buộc (code, discount, expiryDate, discountType)'
       });
     }
 
     // Kiểm tra ngày
     const today = new Date();
-    if (expiryDate && new Date(expiryDate) < today) {
+    if (new Date(expiryDate) < today) {
       return res.status(400).json({
         success: false,
         message: 'Ngày hết hạn không thể là ngày trong quá khứ'
@@ -46,24 +46,44 @@ exports.createVoucher = async (req, res) => {
     }
 
     // Kiểm tra ngày bắt đầu và ngày kết thúc
-    if (startDate && expiryDate && new Date(startDate) > new Date(expiryDate)) {
+    if (startDate && new Date(startDate) > new Date(expiryDate)) {
       return res.status(400).json({
         success: false,
         message: 'Ngày bắt đầu không thể sau ngày hết hạn'
       });
     }
 
-    const voucher = await Voucher.create({
-      code: code.toUpperCase(),
+    // Kiểm tra giá trị discount
+    if (discountType === 'percentage' && discount > 100) {
+      return res.status(400).json({
+        success: false,
+        message: 'Giảm giá theo phần trăm không thể vượt quá 100%'
+      });
+    }
+
+    // Chuẩn bị đối tượng voucher
+    const voucherData = {
+      code: code.toUpperCase().trim(),
       discount,
       startDate: startDate || today,
       expiryDate,
       usageLimit,
-      minOrderValue,
-      type,
+      usageCount: 0,
+      minOrderValue: minOrderValue || 0,
       discountType,
-      maxDiscount: discountType === 'percentage' ? maxDiscount : null
-    });
+      status: status || 'active'
+    };
+
+    // Chỉ thêm maxDiscount nếu discountType là percentage
+    if (discountType === 'percentage' && maxDiscount !== undefined) {
+      voucherData.maxDiscount = maxDiscount;
+    } else {
+      voucherData.maxDiscount = null;
+    }
+
+
+
+    const voucher = await Voucher.create(voucherData);
 
     // Lấy danh sách user để gửi thông báo
     const users = await User.find({ role: 'user' });
@@ -121,7 +141,6 @@ exports.updateVoucher = async (req, res) => {
       status,
       usageLimit,
       minOrderValue,
-      type,
       discountType,
       maxDiscount
     } = req.body;
@@ -136,24 +155,24 @@ exports.updateVoucher = async (req, res) => {
     }
 
     // Kiểm tra ngày bắt đầu và ngày kết thúc
-    if (startDate && expiryDate && new Date(startDate) > new Date(expiryDate)) {
+    const newStartDate = startDate ? new Date(startDate) : voucher.startDate;
+    const newExpiryDate = expiryDate ? new Date(expiryDate) : voucher.expiryDate;
+
+    if (newStartDate > newExpiryDate) {
       return res.status(400).json({
         success: false,
         message: 'Ngày bắt đầu không thể sau ngày hết hạn'
       });
     }
 
-    if (startDate && !expiryDate && new Date(startDate) > new Date(voucher.expiryDate)) {
+    // Kiểm tra giá trị discount
+    const newDiscountType = discountType || voucher.discountType;
+    const newDiscount = discount !== undefined ? discount : voucher.discount;
+    
+    if (newDiscountType === 'percentage' && newDiscount > 100) {
       return res.status(400).json({
         success: false,
-        message: 'Ngày bắt đầu không thể sau ngày hết hạn'
-      });
-    }
-
-    if (!startDate && expiryDate && new Date(voucher.startDate) > new Date(expiryDate)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Ngày bắt đầu không thể sau ngày hết hạn'
+        message: 'Giảm giá theo phần trăm không thể vượt quá 100%'
       });
     }
 
@@ -164,11 +183,10 @@ exports.updateVoucher = async (req, res) => {
     if (status) voucher.status = status;
     if (usageLimit !== undefined) voucher.usageLimit = usageLimit;
     if (minOrderValue !== undefined) voucher.minOrderValue = minOrderValue;
-    if (type) voucher.type = type;
     if (discountType) voucher.discountType = discountType;
     
-    // Chỉ cập nhật maxDiscount nếu discountType là percentage
-    if (voucher.discountType === 'percentage') {
+    // Xử lý maxDiscount dựa trên discountType
+    if (discountType === 'percentage' || voucher.discountType === 'percentage') {
       voucher.maxDiscount = maxDiscount;
     } else {
       voucher.maxDiscount = null;
@@ -195,7 +213,7 @@ exports.updateVoucher = async (req, res) => {
 // @access  Private
 exports.getAvailableVouchers = async (req, res) => {
   try {
-    const { roomId, serviceId, totalAmount, type } = req.query;
+    const { roomId, serviceId, totalAmount } = req.query;
     const now = new Date();
 
     let query = {
@@ -209,8 +227,10 @@ exports.getAvailableVouchers = async (req, res) => {
       query.minOrderValue = { $lte: parseFloat(totalAmount) };
     }
 
+
+
     const vouchers = await Voucher.find(query)
-      .select('code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount type')
+      .select('code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount')
       .sort({ createdAt: -1 });
 
     const availableVouchers = vouchers.map(voucher => {
