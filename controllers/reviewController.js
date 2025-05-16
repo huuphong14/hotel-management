@@ -21,8 +21,8 @@ exports.createReview = async (req, res) => {
     
     // Kiểm tra xem user đã từng đặt phòng ở khách sạn này chưa
     const hasBooking = await Booking.findOne({
-      userId: req.user.id,
-      roomId: roomId,
+      user: req.user.id,
+      room: roomId,
       status: 'completed'
     });
     

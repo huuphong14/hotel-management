@@ -58,6 +58,11 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  provider: {
+    type: String,
+    enum: ['local', 'google', 'facebook'],
+    default: 'local'
+  },
   address: {
     street: String,
     city: String,

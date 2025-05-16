@@ -61,7 +61,7 @@ router.post('/password/reset', resetPassword);
 router.get('/google', googleAuth);
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login', session: false }),
+  passport.authenticate('google', { failureRedirect: '/login', session: false, failureMessage: true }),
   googleCallback
 );
 
@@ -69,7 +69,7 @@ router.get(
 router.get('/facebook', facebookAuth);
 router.get(
   '/facebook/callback',
-  passport.authenticate('facebook', { failureRedirect: '/login', session: false }),
+  passport.authenticate('facebook', { failureRedirect: '/login', session: false, failureMessage: true }),
   facebookCallback
 );
 

@@ -6,6 +6,12 @@ const RoomSchema = new mongoose.Schema({
     ref: 'Hotel',
     required: [true, 'Vui lòng chọn khách sạn']
   },
+  name: {
+    type: String,
+    required: [true, 'Vui lòng nhập tên phòng'],
+    trim: true,
+    maxlength: [100, 'Tên phòng không được vượt quá 100 ký tự']
+  },
   description: {
     type: String,
     required: [true, 'Vui lòng nhập mô tả phòng'],
@@ -80,7 +86,7 @@ const RoomSchema = new mongoose.Schema({
     default: 'available'
   }
 }, {
-  timestamps: true // Tự động thêm createdAt và updatedAt
+  timestamps: true
 });
 
 // Tạo index cho tìm kiếm

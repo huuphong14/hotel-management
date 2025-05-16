@@ -371,46 +371,44 @@ exports.googleAuth = passport.authenticate('google', {
 exports.googleCallback = async (req, res) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Xác thực Google thất bại',
-      });
+      console.error('Google auth failed:', req.session.messages);
+      return res.redirect(`${config.clientUrl}/login?error=auth_failed&message=${encodeURIComponent(req.session.messages?.[0] || 'Xác thực Google thất bại')}`);
     }
 
     const { email, displayName } = req.user;
 
     let existingUser = await User.findOne({ email });
     if (!existingUser) {
-      // Tạo user mới nếu chưa tồn tại
       existingUser = await User.create({
         name: displayName,
         email,
-        password: crypto.randomBytes(20).toString('hex'), // Mật khẩu ngẫu nhiên
+        password: crypto.randomBytes(20).toString('hex'),
         isEmailVerified: true,
         provider: 'google',
+      }).catch(err => {
+        console.error('Error creating Google user:', err);
+        throw new Error('Không thể tạo người dùng mới');
       });
     } else if (existingUser.provider !== 'google') {
-      return res.status(400).json({
-        success: false,
-        message: 'Email đã được đăng ký bằng phương thức khác',
-      });
+      return res.redirect(`${config.clientUrl}/login?error=email_used&message=${encodeURIComponent('Email đã được đăng ký bằng phương thức khác')}`);
     }
 
-    // Kiểm tra trạng thái tài khoản
     if (existingUser.status === 'rejected' || existingUser.status === 'pending') {
-      return res.status(403).json({
-        success: false,
-        message: 'Tài khoản chưa được kích hoạt hoặc bị từ chối',
-      });
+      return res.redirect(`${config.clientUrl}/login?error=account_inactive&message=${encodeURIComponent('Tài khoản chưa được kích hoạt hoặc bị từ chối')}`);
     }
 
-    sendTokenResponse(existingUser, 200, res);
+    const token = existingUser.getAccessToken();
+    const refreshToken = existingUser.getRefreshToken();
+    existingUser.refreshToken = refreshToken;
+    await existingUser.save({ validateBeforeSave: false });
+
+    res.cookie('token', token, { httpOnly: true });
+    res.cookie('refreshToken', refreshToken, { httpOnly: true });
+
+    res.redirect(`${config.clientUrl}/dashboard?token=${token}`);
   } catch (error) {
-    console.error('Lỗi Google Callback:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server',
-    });
+    console.error('Google Callback error:', error);
+    res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);
   }
 };
 
@@ -427,10 +425,8 @@ exports.facebookAuth = passport.authenticate('facebook', {
 exports.facebookCallback = async (req, res) => {
   try {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Xác thực Facebook thất bại',
-      });
+      console.error('Facebook auth failed:', req.session.messages);
+      return res.redirect(`${config.clientUrl}/login?error=auth_failed&message=${encodeURIComponent(req.session.messages?.[0] || 'Xác thực Facebook thất bại')}`);
     }
 
     const { email, displayName } = req.user;
@@ -443,29 +439,30 @@ exports.facebookCallback = async (req, res) => {
         password: crypto.randomBytes(20).toString('hex'),
         isEmailVerified: true,
         provider: 'facebook',
+      }).catch(err => {
+        console.error('Error creating Facebook user:', err);
+        throw new Error('Không thể tạo người dùng mới');
       });
     } else if (existingUser.provider !== 'facebook') {
-      return res.status(400).json({
-        success: false,
-        message: 'Email đã được đăng ký bằng phương thức khác',
-      });
+      return res.redirect(`${config.clientUrl}/login?error=email_used&message=${encodeURIComponent('Email đã được đăng ký bằng phương thức khác')}`);
     }
 
-    // Kiểm tra trạng thái tài khoản
     if (existingUser.status === 'rejected' || existingUser.status === 'pending') {
-      return res.status(403).json({
-        success: false,
-        message: 'Tài khoản chưa được kích hoạt hoặc bị từ chối',
-      });
+      return res.redirect(`${config.clientUrl}/login?error=account_inactive&message=${encodeURIComponent('Tài khoản chưa được kích hoạt hoặc bị từ chối')}`);
     }
 
-    sendTokenResponse(existingUser, 200, res);
+    const token = existingUser.getAccessToken();
+    const refreshToken = existingUser.getRefreshToken();
+    existingUser.refreshToken = refreshToken;
+    await existingUser.save({ validateBeforeSave: false });
+
+    res.cookie('token', token, { httpOnly: true });
+    res.cookie('refreshToken', refreshToken, { httpOnly: true });
+
+    res.redirect(`${config.clientUrl}/dashboard?token=${token}`);
   } catch (error) {
-    console.error('Lỗi Facebook Callback:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi server',
-    });
+    console.error('Facebook Callback error:', error);
+    res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);
   }
 };
 

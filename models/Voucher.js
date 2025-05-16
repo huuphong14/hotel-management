@@ -52,22 +52,6 @@ const voucherSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Phương thức kiểm tra voucher có thể sử dụng - cập nhật để kiểm tra ngày bắt đầu
-voucherSchema.methods.isValid = function(orderValue) {
-  const now = new Date();
-  
-  if (!orderValue) {
-    orderValue = 0;
-  }
-  
-  return (
-    this.status === 'active' &&
-    now >= this.startDate &&  // Kiểm tra đã đến ngày bắt đầu
-    now <= this.expiryDate &&
-    (this.usageLimit === null || this.usageCount < this.usageLimit) &&
-    orderValue >= this.minOrderValue
-  );
-};
 
 // Các phương thức khác không thay đổi
 voucherSchema.methods.calculateDiscount = function(originalPrice) {

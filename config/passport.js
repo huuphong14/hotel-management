@@ -2,6 +2,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const FacebookStrategy = require('passport-facebook').Strategy;
 const config = require('../config/config');
+const User = require('../models/User');
 
 passport.serializeUser((user, done) => {
   done(null, user.id);
@@ -12,6 +13,7 @@ passport.deserializeUser(async (id, done) => {
     const user = await User.findById(id);
     done(null, user);
   } catch (error) {
+    console.error('Deserialize user error:', error);
     done(error, null);
   }
 });
@@ -28,7 +30,8 @@ passport.use(
       try {
         const email = profile.emails && profile.emails[0]?.value;
         if (!email) {
-          return done(new Error('Không thể lấy email từ Google'));
+          console.error('Google OAuth: No email found in profile', profile);
+          return done(null, false, { message: 'Tài khoản Google của bạn không cung cấp email công khai.' });
         }
         const user = {
           googleId: profile.id,
@@ -37,6 +40,7 @@ passport.use(
         };
         return done(null, user);
       } catch (error) {
+        console.error('Google OAuth error:', error);
         return done(error, null);
       }
     }
@@ -56,7 +60,8 @@ passport.use(
       try {
         const email = profile.emails && profile.emails[0]?.value;
         if (!email) {
-          return done(new Error('Không thể lấy email từ Facebook'));
+          console.error('Facebook OAuth: No email found in profile', profile);
+          return done(null, false, { message: 'Tài khoản Facebook của bạn không cung cấp email công khai.' });
         }
         const user = {
           facebookId: profile.id,
@@ -65,6 +70,7 @@ passport.use(
         };
         return done(null, user);
       } catch (error) {
+        console.error('Facebook OAuth error:', error);
         return done(error, null);
       }
     }

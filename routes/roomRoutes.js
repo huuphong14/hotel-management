@@ -1,5 +1,5 @@
 const express = require('express');
-const { createRoom, getRooms, getRoom, updateRoom, deleteRoom, searchRooms, setRoomDiscount, removeRoomDiscount } = require('../controllers/roomController');
+const { createRoom, getRooms, getRoom, updateRoom, deleteRoom, setRoomDiscount, removeRoomDiscount, searchHotelsWithAvailableRooms, getAvailableRoomsByHotel} = require('../controllers/roomController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
 const multer = require('multer');
@@ -24,10 +24,10 @@ const upload = multer({
 });
 
 // Public routes - Không cần đăng nhập
-router.get('/search', searchRooms);
+router.get('/search', searchHotelsWithAvailableRooms);
 router.get('/hotels/:hotelId/rooms', getRooms);
 router.get('/:id', getRoom); // Xem chi tiết một phòng
-
+router.get('/:hotelId/rooms/available', getAvailableRoomsByHotel)
 
 // Protected routes - Cần đăng nhập và phân quyền
 router.use(protect);

@@ -1,10 +1,10 @@
 const express = require('express');
+const { check, validationResult } = require('express-validator');
 const {
   createBooking,
   getMyBookings,
   cancelBooking,
   updateBookingStatus,
-  checkVoucher,
   confirmPayment,
   checkPaymentStatus,
   zaloPayReturn,
@@ -22,6 +22,43 @@ const { authorize } = require('../middlewares/roleCheck');
 
 const router = express.Router();
 
+// Middleware để kiểm tra dữ liệu đầu vào cho createBooking
+const validateCreateBooking = [
+  check('roomId').isMongoId().withMessage('ID phòng không hợp lệ'),
+  check('checkIn').isISO8601().withMessage('Ngày check-in không hợp lệ'),
+  check('checkOut').isISO8601().withMessage('Ngày check-out không hợp lệ'),
+  check('bookingFor').isIn(['self', 'other']).withMessage('bookingFor phải là "self" hoặc "other"'),
+  check('paymentMethod').isIn(['zalopay', 'vnpay', 'credit_card', 'paypal']).withMessage('Phương thức thanh toán không hợp lệ'),
+  // Kiểm tra contactInfo khi bookingFor là 'other'
+  check('contactInfo').custom((value, { req }) => {
+    if (req.body.bookingFor === 'other') {
+      if (!value.name || !value.email || !value.phone) {
+        throw new Error('Thông tin liên hệ phải đầy đủ khi đặt phòng cho người khác');
+      }
+    }
+    return true;
+  }),
+  // Kiểm tra guestInfo khi bookingFor là 'other'
+  check('guestInfo').custom((value, { req }) => {
+    if (req.body.bookingFor === 'other') {
+      if (!value.name || !value.phone) {
+        throw new Error('Thông tin người lưu trú phải bao gồm tên và số điện thoại');
+      }
+    }
+    return true;
+  }),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
 // Public routes for payment callbacks
 router.post('/zalopay-callback', zaloPayCallback);
 router.get('/zalopay-return', zaloPayReturn);
@@ -32,100 +69,12 @@ router.use(protect);
 router.get('/my-hotels', authorize('partner'), getMyHotelBookings);
 
 // User routes
-router.post('/check-voucher', checkVoucher);
-router.post('/', createBooking);
+router.post('/', validateCreateBooking, createBooking);
 router.post('/confirm-payment', confirmPayment);
 router.get('/my-bookings', getMyBookings);
 router.patch('/:id/cancel', cancelBooking);
 router.get('/payment-status/:transactionId', checkPaymentStatus);
 router.get('/vnpay-refund-status/:transactionId', checkVNPayRefundStatus);
-
-
-
-// Trong router của bạn
-router.get('/refund-status/:transactionId', async (req, res) => {
-  try {
-    const { transactionId } = req.params;
-    
-    // Tìm giao dịch thanh toán
-    const payment = await Payment.findOne({ transactionId });
-    
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy giao dịch'
-      });
-    }
-    
-    // Kiểm tra trạng thái hoàn tiền
-    if (!payment.refundTransactionId) {
-      return res.json({
-        success: false,
-        message: 'Chưa có yêu cầu hoàn tiền cho giao dịch này',
-        payment: {
-          transactionId: payment.transactionId,
-          status: payment.status
-        }
-      });
-    }
-    
-    // Kiểm tra trạng thái trong database trước
-    let statusResponse = {
-      success: true,
-      refund: {
-        transactionId: payment.transactionId,
-        refundTransactionId: payment.refundTransactionId,
-        status: payment.status,
-        refundAmount: payment.refundAmount || payment.amount,
-        refundTimestamp: payment.refundTimestamp
-      }
-    };
-    
-    // Nếu đang xử lý hoàn tiền, kiểm tra lại với cổng thanh toán tương ứng
-    if (payment.status === 'refunding') {
-      if (payment.paymentMethod === 'zalopay') {
-        // Kiểm tra với ZaloPay
-        const timestamp = Date.now();
-        const queryData = {
-          app_id: ZaloPayService.config.appId,
-          m_refund_id: payment.refundTransactionId,
-          timestamp: timestamp
-        };
-        
-        const dataStr = `${queryData.app_id}|${queryData.m_refund_id}|${queryData.timestamp}`;
-        queryData.mac = crypto
-          .createHmac('sha256', ZaloPayService.config.key1)
-          .update(dataStr)
-          .digest('hex');
-        
-        const response = await axios.post(`${ZaloPayService.config.endpoint}/query_refund`, null, {
-          params: queryData,
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
-        
-        statusResponse.zaloPayResponse = {
-          return_code: response.data.return_code,
-          return_message: response.data.return_message,
-          status: response.data.return_code === 1 ? 'completed' : 
-                 response.data.return_code === 3 ? 'processing' : 'failed'
-        };
-      } else if (payment.paymentMethod === 'vnpay') {
-        // Kiểm tra với VNPay
-        const refundStatus = await VNPayService.checkRefundStatus(payment.refundTransactionId);
-        statusResponse.vnPayResponse = refundStatus;
-      }
-    }
-    
-    return res.json(statusResponse);
-    
-  } catch (error) {
-    console.error('Lỗi kiểm tra trạng thái hoàn tiền:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Lỗi kiểm tra trạng thái hoàn tiền'
-    });
-  }
-});
 router.get('/:id', getBookingDetails);
 
 // Admin/Partner routes
@@ -140,7 +89,6 @@ router.get(
   authorize('admin', 'partner'),
   getHotelBookings
 );
-
 
 router.get(
   '/admin/all',
