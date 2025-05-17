@@ -25,6 +25,7 @@ const favoriteRoutes = require('./routes/favoriteRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const statisticsRoutes = require('./routes/statisticsRoutes')
 const adminStatisticsRoutes = require('./routes/adminStatisticsRoutes')
+const notificationRoutes = require('./routes/notificationRoutes')
 // Khởi tạo express
 const app = express();
 const server = http.createServer(app);
@@ -78,6 +79,7 @@ app.use('/api/favorites', favoriteRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin-statistics', adminStatisticsRoutes);
+app.use('/api/notifications', notificationRoutes)
 // Route mặc định
 app.get('/', (req, res) => {
   res.send('API đang chạy');

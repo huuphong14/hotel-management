@@ -15,7 +15,8 @@ const {
   getBookingDetails,
   getHotelBookings,
   getAllBookings,
-  getMyHotelBookings
+  getMyHotelBookings,
+  retryPayment
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -59,6 +60,29 @@ const validateCreateBooking = [
   }
 ];
 
+const validateRetryPayment = [
+  check('bookingId').isMongoId().withMessage('ID booking không hợp lệ'),
+  check('paymentMethod').isIn(['zalopay', 'vnpay']).withMessage('Phương thức thanh toán không hợp lệ'),
+  check('paymentMethod').custom((value, { req }) => {
+    // Nếu booking tồn tại, kiểm tra phương thức thanh toán phải khớp
+    return Booking.findById(req.body.bookingId).then(booking => {
+      if (booking && booking.paymentMethod && booking.paymentMethod !== value) {
+        throw new Error('Phương thức thanh toán phải khớp với phương thức ban đầu');
+      }
+    });
+  }),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
+    next();
+  }
+];
+
 // Public routes for payment callbacks
 router.post('/zalopay-callback', zaloPayCallback);
 router.get('/zalopay-return', zaloPayReturn);
@@ -71,6 +95,7 @@ router.get('/my-hotels', authorize('partner'), getMyHotelBookings);
 // User routes
 router.post('/', validateCreateBooking, createBooking);
 router.post('/confirm-payment', confirmPayment);
+router.post('/retry-payment', validateRetryPayment, retryPayment);
 router.get('/my-bookings', getMyBookings);
 router.patch('/:id/cancel', cancelBooking);
 router.get('/payment-status/:transactionId', checkPaymentStatus);

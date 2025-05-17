@@ -71,7 +71,6 @@ async function checkRoomAvailability(roomId, checkIn, checkOut) {
  */
 async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
   const { sort = { discountedPrice: 1 }, skip = 0, limit = 10, minPrice, maxPrice } = options;
-  const currentDate = new Date();
 
   console.log('findAvailableRooms - Query:', query);
   console.log('findAvailableRooms - Options:', options);
@@ -94,20 +93,45 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     },
     { $unwind: '$hotelId' },
     {
+      $lookup: {
+        from: 'amenities',
+        localField: 'amenities',
+        foreignField: '_id',
+        as: 'amenities'
+      }
+    },
+    {
       $addFields: {
+        hasDiscount: {
+          $cond: {
+            if: {
+              $and: [
+                { $gt: ['$discountPercent', 0] },
+                { $ne: ['$discountStartDate', null] },
+                { $ne: ['$discountEndDate', null] },
+                { $gte: [checkIn, '$discountStartDate'] },
+                { $lte: [checkIn, '$discountEndDate'] }
+              ]
+            },
+            then: true,
+            else: false
+          }
+        },
         discountedPrice: {
           $cond: {
             if: {
               $and: [
                 { $gt: ['$discountPercent', 0] },
-                { $gte: [currentDate, '$discountStartDate'] },
-                { $lte: [currentDate, '$discountEndDate'] }
+                { $ne: ['$discountStartDate', null] },
+                { $ne: ['$discountEndDate', null] },
+                { $gte: [checkIn, '$discountStartDate'] },
+                { $lte: [checkIn, '$discountEndDate'] }
               ]
             },
             then: {
               $round: [
                 { $multiply: ['$price', { $subtract: [1, { $divide: ['$discountPercent', 100] }] }] },
-                0
+                2
               ]
             },
             else: '$price'
@@ -118,8 +142,10 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
             if: {
               $and: [
                 { $gt: ['$discountPercent', 0] },
-                { $gte: [currentDate, '$discountStartDate'] },
-                { $lte: [currentDate, '$discountEndDate'] }
+                { $ne: ['$discountStartDate', null] },
+                { $ne: ['$discountEndDate', null] },
+                { $gte: [checkIn, '$discountStartDate'] },
+                { $lte: [checkIn, '$discountEndDate'] }
               ]
             },
             then: '$discountPercent',

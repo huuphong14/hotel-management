@@ -20,109 +20,101 @@ class VNPayService {
 
   // Tạo URL thanh toán
   async createPaymentUrl(booking) {
-    console.log("[VNPay] Creating payment URL for booking:", booking && booking._id ? booking._id : booking);
-    console.log("[VNPay] Booking data:", JSON.stringify(booking));
+  console.log("[VNPay] Creating payment URL for booking:", booking && booking._id ? booking._id : booking);
+  console.log("[VNPay] Booking data:", JSON.stringify(booking));
 
-    const ipAddr = '127.0.0.1'; // In production use req.headers['x-forwarded-for'] || req.connection.remoteAddress
+  const ipAddr = '127.0.0.1';
 
-    const tmnCode = this.config.vnpTmnCode;
-    const secretKey = this.config.vnpHashSecret;
+  const tmnCode = this.config.vnpTmnCode;
+  const secretKey = this.config.vnpHashSecret;
 
-    let vnpUrl = this.config.vnpUrl;
-    const returnUrl = this.config.vnpReturnUrl;
+  let vnpUrl = this.config.vnpUrl;
+  const returnUrl = this.config.vnpReturnUrl;
 
-    const date = new Date();
-    const createDate = date.getFullYear() +
-      ('0' + (date.getMonth() + 1)).slice(-2) +
-      ('0' + date.getDate()).slice(-2) +
-      ('0' + date.getHours()).slice(-2) +
-      ('0' + date.getMinutes()).slice(-2) +
-      ('0' + date.getSeconds()).slice(-2);
+  const date = new Date();
+  const createDate = date.getFullYear() +
+    ('0' + (date.getMonth() + 1)).slice(-2) +
+    ('0' + date.getDate()).slice(-2) +
+    ('0' + date.getHours()).slice(-2) +
+    ('0' + date.getMinutes()).slice(-2) +
+    ('0' + date.getSeconds()).slice(-2);
 
-    // Tạo transaction ID duy nhất
-    const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
+  const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
 
-    // Tạo payment record trong database
-    const payment = await Payment.create({
+  const existingPayment = await Payment.findOne({
+    bookingId: booking._id,
+    status: { $in: ['pending', 'failed'] }
+  });
+
+  if (existingPayment) {
+    console.log(`Found existing payment ${existingPayment.transactionId}, updating...`);
+    existingPayment.transactionId = transactionId;
+    existingPayment.status = 'pending';
+    existingPayment.createdAt = new Date();
+    await existingPayment.save();
+  }
+
+  let payment;
+  if (!existingPayment) {
+    payment = await Payment.create({
       bookingId: booking._id,
       amount: booking.finalPrice,
       transactionId: transactionId,
       paymentMethod: 'vnpay',
       status: 'pending'
     });
-
-    // Lưu thông tin transaction vào booking
-    booking.paymentId = payment._id;
-    booking.paymentMethod = 'vnpay';
-    await booking.save();
-
-    // Tạo dữ liệu thanh toán
-    const orderInfo = `Thanh toan dat phong #${booking._id}`;
-    const orderType = 'billpayment';
-    const locale = 'vn';
-    const currCode = 'VND';
-    let vnpParams = {
-      vnp_Version: '2.1.0',
-      vnp_Command: 'pay',
-      vnp_TmnCode: tmnCode,
-      vnp_Locale: locale,
-      vnp_CurrCode: currCode,
-      vnp_TxnRef: transactionId,
-      vnp_OrderInfo: orderInfo,
-      vnp_OrderType: orderType,
-      vnp_Amount: Math.round(booking.finalPrice * 100), // Đảm bảo là số nguyên
-      vnp_ReturnUrl: returnUrl,
-      vnp_IpAddr: ipAddr,
-      vnp_CreateDate: createDate
-    };
-
-    console.log("[VNPay] Params before signing:", JSON.stringify(vnpParams));
-
-    // Sắp xếp các tham số theo thứ tự alphabet
-    const sortedParams = this.sortObject(vnpParams);
-    console.log("[VNPay] Sorted params:", JSON.stringify(sortedParams));
-
-    // Tạo chuỗi ký với encodeURIComponent
-    const signData = Object.keys(sortedParams)
-      .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
-      .join('&');
-    console.log("[VNPay] signData:", signData);
-
-    const hmac = crypto.createHmac('sha512', secretKey);
-    const signed = hmac.update(signData, 'utf-8').digest('hex');
-
-    vnpParams['vnp_SecureHash'] = signed;
-    vnpUrl += '?' + Object.keys(vnpParams)
-      .map(key => `${key}=${encodeURIComponent(vnpParams[key]).replace(/%20/g, '+')}`)
-      .join('&');
-
-    console.log("[VNPay] Generated payment URL:", vnpUrl);
-
-    return {
-      payUrl: vnpUrl,
-      transactionId: transactionId
-    };
+  } else {
+    payment = existingPayment;
   }
-  // Phương thức xác thực callback từ VNPay
-  verifyReturnUrl(vnpParams) {
-    const secureHash = vnpParams['vnp_SecureHash'];
-    delete vnpParams['vnp_SecureHash'];
-    delete vnpParams['vnp_SecureHashType'];
 
-    const sortedParams = this.sortObject(vnpParams);
-    const signData = Object.keys(sortedParams)
-      .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
-      .join('&');
-    console.log("[VNPay] Verify signData:", signData);
+  booking.paymentId = payment._id;
+  booking.paymentMethod = 'vnpay';
+  await booking.save();
 
-    const hmac = crypto.createHmac('sha512', this.config.vnpHashSecret);
-    const signed = hmac.update(signData, 'utf-8').digest('hex');
+  const orderInfo = `Thanh toan dat phong #${booking._id}`;
+  const orderType = 'billpayment';
+  const locale = 'vn';
+  const currCode = 'VND';
+  let vnpParams = {
+    vnp_Version: '2.1.0',
+    vnp_Command: 'pay',
+    vnp_TmnCode: tmnCode,
+    vnp_Locale: locale,
+    vnp_CurrCode: currCode,
+    vnp_TxnRef: transactionId,
+    vnp_OrderInfo: orderInfo,
+    vnp_OrderType: orderType,
+    vnp_Amount: Math.round(booking.finalPrice * 100),
+    vnp_ReturnUrl: returnUrl,
+    vnp_IpAddr: ipAddr,
+    vnp_CreateDate: createDate
+  };
 
-    console.log("[VNPay] Generated signature:", signed);
-    console.log("[VNPay] Received secureHash:", secureHash);
+  console.log("[VNPay] Params before signing:", JSON.stringify(vnpParams));
 
-    return secureHash === signed;
-  }
+  const sortedParams = this.sortObject(vnpParams);
+  console.log("[VNPay] Sorted params:", JSON.stringify(sortedParams));
+
+  const signData = Object.keys(sortedParams)
+    .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
+    .join('&');
+  console.log("[VNPay] signData:", signData);
+
+  const hmac = crypto.createHmac('sha512', secretKey);
+  const signed = hmac.update(signData, 'utf-8').digest('hex');
+
+  vnpParams['vnp_SecureHash'] = signed;
+  vnpUrl += '?' + Object.keys(vnpParams)
+    .map(key => `${key}=${encodeURIComponent(vnpParams[key]).replace(/%20/g, '+')}`)
+    .join('&');
+
+  console.log("[VNPay] Generated payment URL:", vnpUrl);
+
+  return {
+    payUrl: vnpUrl,
+    transactionId: transactionId
+  };
+}
 
   // Xử lý callback từ VNPay
   async handleCallback(req, res) {
@@ -331,8 +323,7 @@ class VNPayService {
         };
       }
 
-      // Trong môi trường thực tế, bạn sẽ gửi request API đến VNPay để kiểm tra trạng thái hoàn tiền
-      // Đây là code mẫu, trong sandbox VNPay thường không có API kiểm tra hoàn tiền thực
+      // Sandbox VNPay thường không có API kiểm tra hoàn tiền thực
       /*
       const tmnCode = this.config.vnpTmnCode;
       const secretKey = this.config.vnpHashSecret;

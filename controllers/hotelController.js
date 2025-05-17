@@ -1,7 +1,9 @@
 const Hotel = require('../models/Hotel');
-const Room = require('../models/Room')
 const cloudinaryService = require('../config/cloudinaryService');
-
+const Room = require('../models/Room');
+const Location = require('../models/Location');
+const RoomService = require('../services/roomService');
+const mongoose = require('mongoose');
 // @desc    Tạo khách sạn mới
 // @route   POST /api/hotels
 // @access  Private/Hotel Owner
@@ -578,6 +580,298 @@ exports.getDiscountedHotels = async (req, res) => {
     });
   } catch (error) {
     console.error('Chi tiết lỗi:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người
+// @route   GET /api/hotels/search
+// @access  Public
+exports.searchHotelsWithAvailableRooms = async (req, res) => {
+  try {
+    const {
+      locationName,
+      checkIn,
+      checkOut,
+      capacity,
+      hotelName,
+      minPrice,
+      maxPrice,
+      roomType,
+      amenities,
+      sort = 'price',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    // Validate input
+    if (!locationName || !checkIn || !checkOut || !capacity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người'
+      });
+    }
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    if (isNaN(checkInDate) || isNaN(checkOutDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Định dạng ngày không hợp lệ'
+      });
+    }
+    if (checkInDate >= checkOutDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ngày nhận phòng phải trước ngày trả phòng'
+      });
+    }
+
+    // Find location
+    const location = await Location.findOne({
+      name: { $regex: locationName, $options: 'i' },
+      status: 'active'
+    });
+    if (!location) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy địa điểm du lịch này'
+      });
+    }
+
+    // Find hotels
+    const hotelQuery = { locationId: location._id, status: 'active' };
+    if (hotelName) {
+      hotelQuery.name = { $regex: hotelName, $options: 'i' };
+    }
+    const hotels = await Hotel.find(hotelQuery).select('_id');
+    const hotelIds = hotels.map(h => h._id);
+    if (hotelIds.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy khách sạn tại địa điểm này'
+      });
+    }
+
+    // Build room query
+    const roomQuery = {
+      hotelId: { $in: hotelIds },
+      capacity: { $gte: Number(capacity) }
+    };
+    if (roomType) {
+      roomQuery.roomType = roomType;
+    }
+    if (amenities) {
+      const amenitiesArray = Array.isArray(amenities) ? amenities : amenities.split(',');
+      roomQuery.amenities = { $all: amenitiesArray };
+    }
+
+    // Sort options
+    const sortOptions = {};
+    if (sort === 'price') sortOptions.discountedPrice = 1;
+    else if (sort === '-price') sortOptions.discountedPrice = -1;
+    else if (sort === 'rating') sortOptions['hotelId.rating'] = 1;
+    else if (sort === '-rating') sortOptions['hotelId.rating'] = -1;
+    else if (sort === 'discountPercent') sortOptions.discountPercent = 1;
+    else if (sort === '-discountPercent') sortOptions.discountPercent = -1;
+
+    // Fetch available rooms
+    const rooms = await RoomService.findAvailableRooms(
+      roomQuery,
+      checkInDate,
+      checkOutDate,
+      {
+        sort: sortOptions,
+        skip: (Number(page) - 1) * Number(limit),
+        limit: Number(limit),
+        minPrice,
+        maxPrice
+      }
+    );
+
+    // Group by hotel
+    const hotelMap = new Map();
+    rooms.forEach(room => {
+      const hotelId = room.hotelId._id.toString();
+      if (!hotelMap.has(hotelId)) {
+        hotelMap.set(hotelId, {
+          _id: room.hotelId._id,
+          name: room.hotelId.name,
+          address: room.hotelId.address,
+          rating: room.hotelId.rating,
+          images: room.hotelId.images,
+          featuredImage: room.hotelId.featuredImage,
+          policies: room.hotelId.policies,
+          lowestPrice: room.hotelId.lowestPrice,
+          lowestDiscountedPrice: room.hotelId.lowestDiscountedPrice,
+          highestDiscountPercent: room.hotelId.highestDiscountPercent,
+          availableRoomCount: 0
+        });
+      }
+      hotelMap.get(hotelId).availableRoomCount += 1;
+    });
+
+    const hotelsWithAvailableRooms = Array.from(hotelMap.values());
+    const total = hotelsWithAvailableRooms.length;
+
+    res.status(200).json({
+      success: true,
+      count: hotelsWithAvailableRooms.length,
+      total,
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / Number(limit))
+      },
+      data: hotelsWithAvailableRooms
+    });
+  } catch (error) {
+    console.error('Search hotels error:', { message: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Lấy danh sách phòng còn trống trong một khách sạn
+// @route   GET /api/hotels/:hotelId/rooms/available
+// @access  Public
+exports.getAvailableRoomsByHotel = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const {
+      checkIn,
+      checkOut,
+      capacity,
+      minPrice,
+      maxPrice,
+      roomType,
+      amenities,
+      sort = 'price',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    console.log('getAvailableRoomsByHotel - Query params:', req.query, 'Hotel ID:', hotelId);
+
+    // Validate input
+    if (!checkIn || !checkOut || !capacity) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người'
+      });
+    }
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    if (isNaN(checkInDate) || isNaN(checkOutDate)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Định dạng ngày không hợp lệ'
+      });
+    }
+    if (checkInDate >= checkOutDate) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ngày nhận phòng phải trước ngày trả phòng'
+      });
+    }
+
+    // Validate sort
+    const validSortValues = ['price', '-price', 'discountPercent', '-discountPercent'];
+    if (sort && !validSortValues.includes(sort)) {
+      return res.status(400).json({
+        success: false,
+        message: `Giá trị sort không hợp lệ. Chấp nhận: ${validSortValues.join(', ')}`
+      });
+    }
+
+    // Validate hotel
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel || hotel.status !== 'active') {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy khách sạn hoặc khách sạn không hoạt động'
+      });
+    }
+
+    // Build room query
+    const roomQuery = {
+      hotelId: new mongoose.Types.ObjectId(hotelId),
+      capacity: { $gte: Number(capacity) }
+    };
+    if (roomType) {
+      roomQuery.roomType = roomType;
+    }
+    if (amenities) {
+      const amenitiesArray = Array.isArray(amenities) ? amenities : amenities.split(',');
+      roomQuery.amenities = { $all: amenitiesArray };
+    }
+
+    // Sort options
+    const sortOptions = {};
+    if (sort === 'price') sortOptions.discountedPrice = 1;
+    else if (sort === '-price') sortOptions.discountedPrice = -1;
+    else if (sort === 'discountPercent') sortOptions.discountPercent = 1;
+    else if (sort === '-discountPercent') sortOptions.discountPercent = -1;
+
+    // Fetch available rooms
+    const rooms = await RoomService.findAvailableRooms(
+      roomQuery,
+      checkInDate,
+      checkOutDate,
+      {
+        sort: sortOptions,
+        skip: (Number(page) - 1) * Number(limit),
+        limit: Number(limit),
+        minPrice,
+        maxPrice
+      }
+    );
+
+    // Count total rooms
+    const total = (await RoomService.findAvailableRooms(roomQuery, checkInDate, checkOutDate, { minPrice, maxPrice })).length;
+
+    console.log('Available rooms for hotel', hotelId, ':', rooms.map(room => room._id.toString()));
+
+    res.status(200).json({
+      success: true,
+      count: rooms.length,
+      total,
+      pagination: {
+        currentPage: Number(page),
+        totalPages: Math.ceil(total / Number(limit))
+      },
+      data: rooms.map(room => ({
+        _id: room._id,
+        name: room.name,
+        description: room.description,
+        floor: room.floor,
+        roomType: room.roomType,
+        bedType: room.bedType,
+        price: room.price,
+        discountedPrice: room.discountedPrice,
+        discountPercent: room.discountPercent,
+        discountStartDate: room.discountStartDate,
+        discountEndDate: room.discountEndDate,
+        capacity: room.capacity,
+        squareMeters: room.squareMeters,
+        amenities: room.amenities, // Contains full objects: {_id, name, type, icon}
+        images: room.images,
+        cancellationPolicy: room.cancellationPolicy,
+        status: room.status,
+        hasDiscount: room.hasDiscount,
+        createdAt: room.createdAt,
+        updatedAt: room.updatedAt
+      }))
+    });
+  } catch (error) {
+    console.error('Get available rooms error:', { message: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: 'Lỗi server',

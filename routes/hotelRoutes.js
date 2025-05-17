@@ -10,7 +10,9 @@ const {
   updateFeaturedImage,
   getHotelsByLocation,
   getMyHotels,
-  getDiscountedHotels
+  getDiscountedHotels, 
+  searchHotelsWithAvailableRooms,
+  getAvailableRoomsByHotel
 } = require('../controllers/hotelController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
@@ -37,6 +39,8 @@ const upload = multer({
 
 // Public routes
 router.get('/', getHotels);
+router.get('/search', searchHotelsWithAvailableRooms)
+router.get('/:hotelId/rooms/available', getAvailableRoomsByHotel)
 router.get('/my-hotels', protect, authorize('partner'), getMyHotels);
 router.get('/discounts', getDiscountedHotels);
 router.get('/:id', getHotel);
