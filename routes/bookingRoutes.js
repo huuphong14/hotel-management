@@ -20,30 +20,29 @@ const {
 } = require('../controllers/bookingController');
 const { protect } = require('../middlewares/auth');
 const { authorize } = require('../middlewares/roleCheck');
+const Booking = require('../models/Booking');
 
 const router = express.Router();
 
 // Middleware để kiểm tra dữ liệu đầu vào cho createBooking
 const validateCreateBooking = [
-  check('roomId').isMongoId().withMessage('ID phòng không hợp lệ'),
-  check('checkIn').isISO8601().withMessage('Ngày check-in không hợp lệ'),
-  check('checkOut').isISO8601().withMessage('Ngày check-out không hợp lệ'),
-  check('bookingFor').isIn(['self', 'other']).withMessage('bookingFor phải là "self" hoặc "other"'),
-  check('paymentMethod').isIn(['zalopay', 'vnpay', 'credit_card', 'paypal']).withMessage('Phương thức thanh toán không hợp lệ'),
-  // Kiểm tra contactInfo khi bookingFor là 'other'
+  check('roomId').isMongoId().withMessage('Invalid room ID'),
+  check('checkIn').isISO8601().withMessage('Invalid check-in date'),
+  check('checkOut').isISO8601().withMessage('Invalid check-out date'),
+  check('bookingFor').isIn(['self', 'other']).withMessage('bookingFor must be "self" or "other"'),
+  check('paymentMethod').isIn(['zalopay', 'vnpay', 'credit_card', 'paypal']).withMessage('Invalid payment method'),
   check('contactInfo').custom((value, { req }) => {
     if (req.body.bookingFor === 'other') {
       if (!value.name || !value.email || !value.phone) {
-        throw new Error('Thông tin liên hệ phải đầy đủ khi đặt phòng cho người khác');
+        throw new Error('Contact information must be complete when booking for someone else');
       }
     }
     return true;
   }),
-  // Kiểm tra guestInfo khi bookingFor là 'other'
   check('guestInfo').custom((value, { req }) => {
     if (req.body.bookingFor === 'other') {
       if (!value.name || !value.phone) {
-        throw new Error('Thông tin người lưu trú phải bao gồm tên và số điện thoại');
+        throw new Error('Guest information must include name and phone number');
       }
     }
     return true;
@@ -61,13 +60,12 @@ const validateCreateBooking = [
 ];
 
 const validateRetryPayment = [
-  check('bookingId').isMongoId().withMessage('ID booking không hợp lệ'),
-  check('paymentMethod').isIn(['zalopay', 'vnpay']).withMessage('Phương thức thanh toán không hợp lệ'),
+  check('bookingId').isMongoId().withMessage('Invalid booking ID'),
+  check('paymentMethod').isIn(['zalopay', 'vnpay']).withMessage('Invalid payment method'),
   check('paymentMethod').custom((value, { req }) => {
-    // Nếu booking tồn tại, kiểm tra phương thức thanh toán phải khớp
     return Booking.findById(req.body.bookingId).then(booking => {
       if (booking && booking.paymentMethod && booking.paymentMethod !== value) {
-        throw new Error('Phương thức thanh toán phải khớp với phương thức ban đầu');
+        throw new Error('Payment method must match the original method');
       }
     });
   }),

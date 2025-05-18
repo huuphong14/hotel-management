@@ -33,7 +33,7 @@ const paymentSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded', 'refunding', 'refund_failed'],
+    enum: ['pending', 'completed', 'failed', 'refunded', 'refunding', 'refund_failed', 'cancelled'],
     default: 'pending'
   },
   // Thêm các trường cho hoàn tiền

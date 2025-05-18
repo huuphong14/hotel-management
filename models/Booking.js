@@ -144,12 +144,12 @@ const bookingSchema = new mongoose.Schema({
   refundTimestamp: {
     type: Date
   },
-  retryCount: { // Thêm mới
+  retryCount: {
     type: Number,
     default: 0,
     min: 0
   },
-  lastRetryAt: { // Thêm mới
+  lastRetryAt: {
     type: Date
   }
 }, {
@@ -162,6 +162,7 @@ bookingSchema.index({ paymentId: 1 });
 bookingSchema.index({ transactionId: 1 });
 bookingSchema.index({ refundTransactionId: 1 });
 bookingSchema.index({ status: 1, checkIn: 1, checkOut: 1 });
+bookingSchema.index({ retryCount: 1, lastRetryAt: 1 }); // Thêm index mới
 
 bookingSchema.pre('save', function(next) {
   if (this.checkOut <= this.checkIn) {

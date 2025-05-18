@@ -9,29 +9,54 @@ const session = require('express-session');
 const http = require('http');
 const socketIO = require('./utils/socket');
 const { scheduleUpdateLowestPrices } = require('./utils/cronJobs');
+const cancelExpiredBookings = require('./jobs/cancelExpiredBookings'); // Thêm cron job mới
+const promClient = require('prom-client'); // Thêm Prometheus client
+const cron = require('node-cron'); // Thêm node-cron
 
 // Load các routes
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const hotelRoutes = require('./routes/hotelRoutes');
-const roomRoutes = require('./routes/roomRoutes')
+const roomRoutes = require('./routes/roomRoutes');
 const postRoutes = require('./routes/postRoutes');
 const bookingRoutes = require('./routes/bookingRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
-const amenityRoute = require('./routes/amenityroute');
+const amenityRoute = require('./routes/amenityRoute');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const locationRoutes = require('./routes/locationRoutes');
-const statisticsRoutes = require('./routes/statisticsRoutes')
-const adminStatisticsRoutes = require('./routes/adminStatisticsRoutes')
-const notificationRoutes = require('./routes/notificationRoutes')
+const statisticsRoutes = require('./routes/statisticsRoutes');
+const adminStatisticsRoutes = require('./routes/adminStatisticsRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+
 // Khởi tạo express
 const app = express();
 const server = http.createServer(app);
 
 // Kết nối đến database
 connectDB();
+
+// Cấu hình Prometheus
+promClient.collectDefaultMetrics(); // Thu thập các metric mặc định (CPU, memory, v.v.)
+const httpRequestDurationMicroseconds = new promClient.Histogram({
+  name: 'http_request_duration_ms',
+  help: 'Duration of HTTP requests in ms',
+  labelNames: ['method', 'route', 'code'],
+  buckets: [50, 100, 200, 300, 500, 1000, 2000] // Các mức thời gian phản hồi
+});
+
+// Middleware để đo thời gian xử lý request
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    httpRequestDurationMicroseconds
+      .labels(req.method, req.originalUrl, res.statusCode)
+      .observe(duration);
+  });
+  next();
+});
 
 // Middleware
 app.use(express.json());
@@ -48,7 +73,7 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 24 * 60 * 60 * 1000 // 24 giờ
   }
 }));
 
@@ -62,7 +87,23 @@ require('./config/passport');
 // Khởi tạo Socket.IO
 socketIO.init(server);
 
+// Cấu hình cron jobs
 scheduleUpdateLowestPrices();
+cron.schedule('0 * * * *', cancelExpiredBookings); // Chạy mỗi giờ để hủy booking quá hạn
+
+// Route để expose Prometheus metrics
+app.get('/metrics', async (req, res) => {
+  try {
+    res.set('Content-Type', promClient.register.contentType);
+    res.end(await promClient.register.metrics());
+  } catch (error) {
+    console.error('Error exposing metrics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching metrics'
+    });
+  }
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -79,7 +120,8 @@ app.use('/api/favorites', favoriteRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin-statistics', adminStatisticsRoutes);
-app.use('/api/notifications', notificationRoutes)
+app.use('/api/notifications', notificationRoutes);
+
 // Route mặc định
 app.get('/', (req, res) => {
   res.send('API đang chạy');
@@ -93,8 +135,34 @@ app.use((req, res) => {
   });
 });
 
+// Xử lý lỗi toàn cục
+app.use((err, req, res, next) => {
+  console.error('Server error:', {
+    message: err.message,
+    stack: err.stack,
+    method: req.method,
+    url: req.originalUrl
+  });
+  res.status(500).json({
+    success: false,
+    message: 'Lỗi server',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
+});
+
 // Khởi động server
 const PORT = config.port;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+// Xử lý lỗi không bắt được
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Rejection:', err);
+  process.exit(1);
 });

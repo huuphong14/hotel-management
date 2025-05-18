@@ -1,4 +1,3 @@
-// Thêm vào zaloPayService.js
 const axios = require('axios');
 const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
@@ -16,10 +15,9 @@ class ZaloPayService {
     endpoint: process.env.ZALOPAY_ENDPOINT,
     returnUrl: process.env.ZALOPAY_RETURN_URL,
     cancelUrl: process.env.ZALOPAY_CANCEL_URL,
-    callbackUrl: process.env.ZALOPAY_CALLBACK_URL // Thêm URL callback
+    callbackUrl: process.env.ZALOPAY_CALLBACK_URL
   };
 
-  // Các phương thức hiện tại
   static generateTransactionId() {
     const datePrefix = moment().utcOffset('+07:00').format('YYMMDD');
     const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
@@ -42,9 +40,7 @@ class ZaloPayService {
       .digest('hex');
   }
 
-  // Tạo chữ ký cho callback
   static verifyCallbackSignature(data, mac) {
-    // ZaloPay sẽ gửi dữ liệu và chữ ký (mac)
     const dataStr = Object.keys(data)
       .filter(key => key !== 'mac')
       .sort()
@@ -64,9 +60,16 @@ class ZaloPayService {
     const transactionId = this.generateTransactionId();
     const amount = Math.round(booking.finalPrice);
 
+    // Làm sạch các giao dịch cũ
+    await Payment.updateMany(
+      { bookingId: booking._id, status: { $in: ['pending', 'failed'] } },
+      { status: 'cancelled' }
+    );
+    console.log(`Cancelled existing pending/failed payments for booking ${booking._id}`);
+
     const existingPayment = await Payment.findOne({
       bookingId: booking._id,
-      status: { $in: ['pending', 'failed'] }
+      status: 'cancelled'
     });
 
     if (existingPayment) {
@@ -79,11 +82,11 @@ class ZaloPayService {
 
     const orderData = {
       app_id: Number(this.config.appId),
-      app_user: booking.user.toString(),
+      app_user: booking.user._id ? booking.user._id.toString() : booking.user.toString(), // Chỉ lấy _id
       app_trans_id: transactionId,
       app_time: Date.now(),
       item: JSON.stringify([{
-        itemid: booking.room.toString(),
+        itemid: booking.room._id ? booking.room._id.toString() : booking.room.toString(), // Chỉ lấy _id
         itemname: 'Room Booking',
         itemprice: amount,
         itemquantity: 1
@@ -131,20 +134,17 @@ class ZaloPayService {
       };
     } catch (error) {
       console.error('ZaloPay payment URL creation error:', error.response?.data || error.message);
-      throw new Error('Không thể tạo liên kết thanh toán');
+      throw new Error(`Không thể tạo liên kết thanh toán: ${error.response?.data?.return_message || error.message}`);
     }
   }
-
   static async refundPayment(booking) {
     console.log(`=== STARTING REFUND PROCESS FOR BOOKING ${booking._id} ===`);
 
-    // Kiểm tra xem booking có thể hoàn tiền không
     if (!['confirmed', 'pending'].includes(booking.status)) {
       console.error(`Không thể hoàn tiền cho booking ${booking._id} với trạng thái ${booking.status}`);
       throw new Error('Booking không ở trạng thái có thể hoàn tiền');
     }
 
-    // Tìm giao dịch thanh toán đã hoàn tất
     console.log(`Tìm giao dịch thanh toán cho booking ${booking._id}`);
     const payment = await Payment.findOne({
       bookingId: booking._id,
@@ -156,7 +156,6 @@ class ZaloPayService {
       throw new Error('Không tìm thấy giao dịch thanh toán');
     }
 
-    // Kiểm tra nếu đã hoàn tiền trước đó
     if (payment.status === 'refunded') {
       console.warn(`Booking ${booking._id} đã được hoàn tiền trước đó`);
       throw new Error('Giao dịch này đã được hoàn tiền');
@@ -164,10 +163,8 @@ class ZaloPayService {
 
     console.log(`Giao dịch thanh toán tìm thấy: ${payment.transactionId}`);
 
-    // Lấy mã giao dịch ZaloPay (zp_trans_id)
     let zpTransId = payment.zpTransId;
 
-    // Nếu không có zpTransId, thực hiện truy vấn để lấy
     if (!zpTransId) {
       console.log(`Không tìm thấy zpTransId, tiến hành truy vấn từ ZaloPay`);
       try {
@@ -175,7 +172,6 @@ class ZaloPayService {
 
         if (verifyResult.return_code === 1 && verifyResult.zp_trans_id) {
           zpTransId = verifyResult.zp_trans_id;
-          // Lưu lại để dùng sau
           payment.zpTransId = zpTransId;
           await payment.save();
           console.log(`Đã lấy và lưu zpTransId: ${zpTransId}`);
@@ -191,18 +187,16 @@ class ZaloPayService {
 
     console.log(`Sử dụng zpTransId: ${zpTransId} cho yêu cầu hoàn tiền`);
 
-    // Tạo m_refund_id theo định dạng yymmdd_appid_xxxxxxxxxx
     const timestamp = Date.now();
     const uid = `${timestamp}${Math.floor(111 + Math.random() * 999)}`;
     const mRefundId = `${moment().format('YYMMDD')}_${this.config.appId}_${uid}`;
     console.log(`Tạo m_refund_id: ${mRefundId}`);
 
-    // Tạo dữ liệu yêu cầu hoàn tiền
     const refundData = {
       app_id: this.config.appId,
       m_refund_id: mRefundId,
       zp_trans_id: zpTransId,
-      amount: 170000,
+      amount: payment.amount,
       timestamp: timestamp,
       description: `Refund for Booking ${booking._id}`
     };
@@ -215,14 +209,11 @@ class ZaloPayService {
     console.log(`- timestamp: ${refundData.timestamp}`);
     console.log(`- description: ${refundData.description}`);
 
-    // Tạo chuỗi dữ liệu cho MAC theo cách trong mẫu
-    // app_id|zp_trans_id|amount|description|timestamp
     const dataStr = refundData.app_id + "|" + refundData.zp_trans_id + "|" +
       refundData.amount + "|" + refundData.description + "|" + refundData.timestamp;
 
     console.log(`Chuỗi dữ liệu chữ ký: ${dataStr}`);
 
-    // Tạo chữ ký (mac) sử dụng CryptoJS
     refundData.mac = CryptoJS.HmacSHA256(dataStr, this.config.key1).toString();
     console.log(`Chữ ký được tạo: ${refundData.mac}`);
 
@@ -242,44 +233,40 @@ class ZaloPayService {
 
       const { return_code, return_message, refund_id } = response.data;
 
-      if (return_code === 1) { // Hoàn tiền thành công
+      if (return_code === 1) {
         console.log(`Hoàn tiền thành công cho booking ${booking._id}`);
 
-        // Cập nhật trạng thái thanh toán
         payment.status = 'refunded';
         payment.refundTransactionId = mRefundId;
-        payment.zaloRefundId = refund_id; // Lưu refund_id từ ZaloPay
+        payment.zaloRefundId = refund_id;
         payment.refundTimestamp = new Date();
         payment.refundAmount = payment.amount;
         await payment.save();
         console.log(`Đã cập nhật trạng thái thanh toán thành 'refunded'`);
 
-        // Cập nhật trạng thái booking
         booking.status = 'cancelled';
         booking.cancelledAt = new Date();
         booking.cancellationReason = 'user_requested';
         await booking.save();
         console.log(`Đã cập nhật trạng thái booking thành 'cancelled'`);
 
-        // Gửi email thông báo hoàn tiền
         await this.sendRefundNotification(booking, payment);
         console.log(`Đã gửi thông báo hoàn tiền`);
 
         return true;
-      } else if (return_code === 2) { // Hoàn tiền thất bại
+      } else if (return_code === 2) {
         console.error(`Hoàn tiền thất bại: ${return_message}`);
         payment.status = 'refund_failed';
         payment.refundFailReason = return_message;
         await payment.save();
         throw new Error(`Hoàn tiền thất bại: ${return_message}`);
-      } else if (return_code === 3) { // Đang xử lý
+      } else if (return_code === 3) {
         console.log(`Giao dịch hoàn tiền đang xử lý, cần kiểm tra lại sau`);
         payment.refundTransactionId = mRefundId;
         payment.zaloRefundId = refund_id;
-        payment.status = 'refunding'; // Sử dụng trạng thái mới
+        payment.status = 'refunding';
         await payment.save();
 
-        // Lên lịch kiểm tra lại sau 1 phút
         setTimeout(async () => {
           await this.checkRefundStatus(mRefundId, booking, payment);
         }, 60000);
@@ -369,13 +356,11 @@ class ZaloPayService {
     try {
       console.log(`Verifying payment for transaction: ${transactionId}`);
 
-      // Cấu trúc dữ liệu xác minh
       const data = {
         app_id: this.config.appId,
         app_trans_id: transactionId,
       };
 
-      // Tạo chữ ký
       const dataString = `${data.app_id}|${data.app_trans_id}|${this.config.key1}`;
       const mac = crypto
         .createHmac('sha256', this.config.key1)
@@ -388,7 +373,6 @@ class ZaloPayService {
 
       data.mac = mac;
 
-      // Gọi API ZaloPay kiểm tra trạng thái
       console.log(`Sending verification request to ${this.config.endpoint}/query`);
       const response = await axios.post(`${this.config.endpoint}/query`, null, {
         params: data,
@@ -410,7 +394,6 @@ class ZaloPayService {
     console.log('Headers:', JSON.stringify(req.headers));
 
     try {
-      // Kiểm tra body
       if (!req.body || Object.keys(req.body).length === 0) {
         console.error('ERROR: Empty callback data received');
         return res.status(400).json({
@@ -422,14 +405,11 @@ class ZaloPayService {
       let callbackData = req.body;
       console.log('Received ZaloPay callback data:', JSON.stringify(callbackData, null, 2));
 
-      // Xử lý dữ liệu bọc trong field "data" nếu có
       if (callbackData.data && callbackData.mac && callbackData.type) {
         try {
-          // Nếu callback được bọc trong cấu trúc {data, mac, type}
           const dataString = callbackData.data;
           const receivedMac = callbackData.mac;
 
-          // Xác minh chữ ký của cấu trúc bao bọc
           const dataSignature = crypto
             .createHmac('sha256', this.config.key2)
             .update(dataString)
@@ -448,7 +428,6 @@ class ZaloPayService {
             });
           }
 
-          // Parse dữ liệu trong trường data
           callbackData = JSON.parse(dataString);
           console.log('Parsed inner data:', JSON.stringify(callbackData, null, 2));
         } catch (parseError) {
@@ -460,7 +439,6 @@ class ZaloPayService {
         }
       }
 
-      // Kiểm tra các trường bắt buộc
       const requiredFields = ['app_id', 'app_trans_id', 'amount', 'embed_data'];
       const missingFields = requiredFields.filter(field => !callbackData[field]);
 
@@ -472,7 +450,6 @@ class ZaloPayService {
         });
       }
 
-      // Parsing embedded data
       let bookingId;
       try {
         console.log('Parsing embed_data...');
@@ -495,10 +472,8 @@ class ZaloPayService {
       }
 
       const { app_trans_id, amount, zp_trans_id } = callbackData;
-      // Lấy trạng thái giao dịch - một số version API ZaloPay có thể sử dụng trans_status hoặc status
       const trans_status = callbackData.trans_status || callbackData.status || 1;
 
-      // Tìm giao dịch thanh toán
       console.log('Finding payment record with transactionId:', app_trans_id);
       const payment = await Payment.findOne({ transactionId: app_trans_id });
 
@@ -512,22 +487,18 @@ class ZaloPayService {
 
       console.log('Found payment record:', JSON.stringify(payment));
 
-      // Cập nhật thông tin thanh toán với mã giao dịch ZaloPay
       console.log('Updating payment information...');
-      // Lưu mã giao dịch ZaloPay vào trường mới
       payment.zpTransId = zp_trans_id;
       console.log(`Saved ZaloPay transaction ID (zpTransId): ${zp_trans_id}`);
 
-      // Kiểm tra trạng thái giao dịch
       console.log('Transaction status from ZaloPay:', trans_status);
 
-      if (trans_status === 1 || trans_status === '1') { // Thành công
+      if (trans_status === 1 || trans_status === '1') {
         console.log('Payment successful. Updating status to "completed"');
         payment.status = 'completed';
         await payment.save();
         console.log('Payment status updated successfully');
 
-        // Cập nhật trạng thái booking
         console.log('Fetching booking with ID:', bookingId);
         const booking = await Booking.findById(bookingId);
 
@@ -540,20 +511,18 @@ class ZaloPayService {
           await booking.save();
           console.log('Booking updated successfully');
 
-          // Gửi thông báo và email xác nhận
           console.log('Sending payment confirmation...');
           await this.sendPaymentConfirmation(booking, payment);
           console.log('Payment confirmation sent');
         } else {
           console.error(`ERROR: Booking with ID ${bookingId} not found`);
         }
-      } else if (trans_status === 2 || trans_status === '2') { // Thất bại
+      } else if (trans_status === 2 || trans_status === '2') {
         console.log('Payment failed. Updating status to "failed"');
         payment.status = 'failed';
         await payment.save();
         console.log('Payment status updated to "failed"');
 
-        // Cập nhật trạng thái booking
         console.log('Fetching booking with ID:', bookingId);
         const booking = await Booking.findById(bookingId);
 
@@ -571,7 +540,6 @@ class ZaloPayService {
         console.log(`Unhandled transaction status: ${trans_status}`);
       }
 
-      // Phản hồi cho ZaloPay
       console.log('Responding to ZaloPay with success');
       console.log('==== ZALOPAY CALLBACK COMPLETED ====');
       return res.json({ return_code: 1, return_message: 'Success' });
@@ -588,16 +556,13 @@ class ZaloPayService {
     }
   }
 
-  // Xử lý khi người dùng quay lại từ cổng thanh toán
   static async handleRedirect(req, res) {
     try {
       console.log("Nhận request từ cổng thanh toán:", req.query);
 
       const { status, apptransid, checksum } = req.query;
 
-      // Kiểm tra checksum nếu có
       if (checksum) {
-        // Xác minh checksum từ ZaloPay redirect (nếu cần)
         const dataStr = Object.keys(req.query)
           .filter(key => key !== 'checksum')
           .sort()
@@ -619,25 +584,20 @@ class ZaloPayService {
         }
       }
 
-      // Kiểm tra trạng thái giao dịch
-      if (status === '1') { // Success
+      if (status === '1') {
         console.log(`Giao dịch thành công, transactionId: ${apptransid}`);
 
         try {
-          // Xác minh lại với ZaloPay
           const verifyResult = await this.verifyPayment(apptransid);
           console.log("Kết quả xác minh từ ZaloPay:", verifyResult);
 
-          // Cần kiểm tra cả return_code và status của giao dịch
           if (verifyResult.return_code === 1 ||
             (verifyResult.return_code === 2 && verifyResult.status === 1)) {
 
-            // Tìm giao dịch và cập nhật nếu chưa được cập nhật bởi callback
             const payment = await Payment.findOne({ transactionId: apptransid });
             console.log("Thông tin thanh toán trước khi cập nhật:", payment);
 
             if (payment) {
-              // Cập nhật mã giao dịch ZaloPay nếu có trong kết quả xác minh
               if (verifyResult.zp_trans_id && !payment.zpTransId) {
                 payment.zpTransId = verifyResult.zp_trans_id;
                 console.log(`Cập nhật zpTransId: ${verifyResult.zp_trans_id}`);
@@ -657,19 +617,16 @@ class ZaloPayService {
                   await booking.save();
                   console.log("Đã cập nhật trạng thái đặt phòng:", booking);
 
-                  // Gửi thông báo xác nhận
                   await this.sendPaymentConfirmation(booking, payment);
                   console.log("Đã gửi thông báo xác nhận thanh toán.");
                 }
               } else {
-                // Nếu đã completed rồi nhưng chưa có zpTransId, cập nhật và lưu
                 if (verifyResult.zp_trans_id && !payment.zpTransId) {
                   await payment.save();
                   console.log("Đã cập nhật zpTransId cho giao dịch đã hoàn tất.");
                 }
               }
 
-              // Chuyển hướng người dùng đến trang thành công
               console.log(`Chuyển hướng đến trang thành công: /booking-success/${payment.bookingId}`);
               return res.redirect(`/booking-success/${payment.bookingId}`);
             } else {
@@ -682,11 +639,9 @@ class ZaloPayService {
           }
         } catch (verifyError) {
           console.error("Lỗi xác minh giao dịch:", verifyError);
-          // Nếu có lỗi xác minh, vẫn cho phép tiếp tục dựa vào trạng thái redirect
           const payment = await Payment.findOne({ transactionId: apptransid });
 
           if (payment && payment.status !== 'completed') {
-            // Cập nhật và chuyển hướng đến trang thành công
             payment.status = 'completed';
             await payment.save();
 
@@ -702,7 +657,6 @@ class ZaloPayService {
         }
       }
 
-      // Chuyển hướng đến trang thất bại nếu không thành công
       console.log("Giao dịch thất bại hoặc không xác minh được. Chuyển hướng đến /payment-failed");
       return res.redirect('/payment-failed');
     } catch (error) {
@@ -711,16 +665,13 @@ class ZaloPayService {
     }
   }
 
-  // Gửi thông báo xác nhận thanh toán
   static async sendPaymentConfirmation(booking, payment) {
     try {
-      // Lấy thông tin phòng và người dùng
       await booking.populate([
         { path: 'room', select: 'name type price' },
         { path: 'user', select: 'name email' }
       ]);
 
-      // Tạo thông báo
       await NotificationService.createNotification({
         user: booking.user._id,
         title: 'Thanh toán thành công',
@@ -730,7 +681,6 @@ class ZaloPayService {
         relatedId: booking._id
       });
 
-      // Gửi email
       const message = `
         <h1>Xác nhận thanh toán</h1>
         <p>Xin chào ${booking.user.name},</p>
@@ -757,16 +707,13 @@ class ZaloPayService {
     }
   }
 
-  // Gửi thông báo hoàn tiền
   static async sendRefundNotification(booking, payment) {
     try {
-      // Lấy thông tin phòng và người dùng
       await booking.populate([
         { path: 'room', select: 'name type price' },
         { path: 'user', select: 'name email' }
       ]);
 
-      // Tạo thông báo
       await NotificationService.createNotification({
         user: booking.user._id,
         title: 'Hoàn tiền thành công',
@@ -776,7 +723,6 @@ class ZaloPayService {
         relatedId: booking._id
       });
 
-      // Gửi email
       const message = `
         <h1>Xác nhận hoàn tiền</h1>
         <p>Xin chào ${booking.user.name},</p>

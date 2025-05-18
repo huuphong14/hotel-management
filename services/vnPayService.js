@@ -18,105 +18,108 @@ class VNPayService {
     };
   }
 
-  // Tạo URL thanh toán
   async createPaymentUrl(booking) {
-  console.log("[VNPay] Creating payment URL for booking:", booking && booking._id ? booking._id : booking);
-  console.log("[VNPay] Booking data:", JSON.stringify(booking));
+    console.log("[VNPay] Creating payment URL for booking:", booking && booking._id ? booking._id : booking);
+    console.log("[VNPay] Booking data:", JSON.stringify(booking));
 
-  const ipAddr = '127.0.0.1';
+    const ipAddr = '127.0.0.1';
+    const tmnCode = this.config.vnpTmnCode;
+    const secretKey = this.config.vnpHashSecret;
+    let vnpUrl = this.config.vnpUrl;
+    const returnUrl = this.config.vnpReturnUrl;
 
-  const tmnCode = this.config.vnpTmnCode;
-  const secretKey = this.config.vnpHashSecret;
+    const date = new Date();
+    const createDate = date.getFullYear() +
+      ('0' + (date.getMonth() + 1)).slice(-2) +
+      ('0' + date.getDate()).slice(-2) +
+      ('0' + date.getHours()).slice(-2) +
+      ('0' + date.getMinutes()).slice(-2) +
+      ('0' + date.getSeconds()).slice(-2);
 
-  let vnpUrl = this.config.vnpUrl;
-  const returnUrl = this.config.vnpReturnUrl;
+     const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
 
-  const date = new Date();
-  const createDate = date.getFullYear() +
-    ('0' + (date.getMonth() + 1)).slice(-2) +
-    ('0' + date.getDate()).slice(-2) +
-    ('0' + date.getHours()).slice(-2) +
-    ('0' + date.getMinutes()).slice(-2) +
-    ('0' + date.getSeconds()).slice(-2);
+    // Làm sạch các giao dịch cũ
+    await Payment.updateMany(
+      { bookingId: booking._id, status: { $in: ['pending', 'failed'] } },
+      { status: 'cancelled' }
+    );
+    console.log(`Cancelled existing pending/failed payments for booking ${booking._id}`);
 
-  const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
-
-  const existingPayment = await Payment.findOne({
-    bookingId: booking._id,
-    status: { $in: ['pending', 'failed'] }
-  });
-
-  if (existingPayment) {
-    console.log(`Found existing payment ${existingPayment.transactionId}, updating...`);
-    existingPayment.transactionId = transactionId;
-    existingPayment.status = 'pending';
-    existingPayment.createdAt = new Date();
-    await existingPayment.save();
-  }
-
-  let payment;
-  if (!existingPayment) {
-    payment = await Payment.create({
+    const existingPayment = await Payment.findOne({
       bookingId: booking._id,
-      amount: booking.finalPrice,
-      transactionId: transactionId,
-      paymentMethod: 'vnpay',
-      status: 'pending'
+      status: { $in: ['pending', 'failed', 'cancelled'] }
     });
-  } else {
-    payment = existingPayment;
+
+    let payment;
+    if (existingPayment) {
+      console.log(`Found existing payment ${existingPayment.transactionId}, updating...`);
+      existingPayment.transactionId = transactionId;
+      existingPayment.status = 'pending';
+      existingPayment.createdAt = new Date();
+      await existingPayment.save();
+      payment = existingPayment;
+    } else {
+      payment = await Payment.create({
+        bookingId: booking._id,
+        amount: booking.finalPrice,
+        transactionId: transactionId,
+        paymentMethod: 'vnpay',
+        status: 'pending'
+      });
+    }
+
+    booking.paymentId = payment._id;
+    booking.paymentMethod = 'vnpay';
+    await booking.save();
+
+    const orderInfo = `Thanh toan dat phong #${booking._id}`;
+    const orderType = 'billpayment';
+    const locale = 'vn';
+    const currCode = 'VND';
+    let vnpParams = {
+      vnp_Version: '2.1.0',
+      vnp_Command: 'pay',
+      vnp_TmnCode: tmnCode,
+      vnp_Locale: locale,
+      vnp_CurrCode: currCode,
+      vnp_TxnRef: transactionId,
+      vnp_OrderInfo: orderInfo,
+      vnp_OrderType: orderType,
+      vnp_Amount: Math.round(booking.finalPrice * 100),
+      vnp_ReturnUrl: returnUrl,
+      vnp_IpAddr: ipAddr,
+      vnp_CreateDate: createDate
+    };
+
+    console.log("[VNPay] Params before signing:", JSON.stringify(vnpParams));
+
+    const sortedParams = this.sortObject(vnpParams);
+    console.log("[VNPay] Sorted params:", JSON.stringify(sortedParams));
+
+    const signData = Object.keys(sortedParams)
+      .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
+      .join('&');
+    console.log("[VNPay] signData:", signData);
+
+    const hmac = crypto.createHmac('sha512', secretKey);
+    const signed = hmac.update(signData, 'utf-8').digest('hex');
+
+    vnpParams['vnp_SecureHash'] = signed;
+    vnpUrl += '?' + Object.keys(vnpParams)
+      .map(key => `${key}=${encodeURIComponent(vnpParams[key]).replace(/%20/g, '+')}`)
+      .join('&');
+
+    console.log("[VNPay] Generated payment URL:", vnpUrl);
+
+    return {
+      payUrl: vnpUrl,
+      transactionId: transactionId
+    };
+  } catch (error) {
+    console.error('[VNPay] Payment URL creation error:', error.response?.data || error.message);
+    throw new Error(`Không thể tạo liên kết thanh toán: ${error.response?.data?.message || error.message}`);
   }
 
-  booking.paymentId = payment._id;
-  booking.paymentMethod = 'vnpay';
-  await booking.save();
-
-  const orderInfo = `Thanh toan dat phong #${booking._id}`;
-  const orderType = 'billpayment';
-  const locale = 'vn';
-  const currCode = 'VND';
-  let vnpParams = {
-    vnp_Version: '2.1.0',
-    vnp_Command: 'pay',
-    vnp_TmnCode: tmnCode,
-    vnp_Locale: locale,
-    vnp_CurrCode: currCode,
-    vnp_TxnRef: transactionId,
-    vnp_OrderInfo: orderInfo,
-    vnp_OrderType: orderType,
-    vnp_Amount: Math.round(booking.finalPrice * 100),
-    vnp_ReturnUrl: returnUrl,
-    vnp_IpAddr: ipAddr,
-    vnp_CreateDate: createDate
-  };
-
-  console.log("[VNPay] Params before signing:", JSON.stringify(vnpParams));
-
-  const sortedParams = this.sortObject(vnpParams);
-  console.log("[VNPay] Sorted params:", JSON.stringify(sortedParams));
-
-  const signData = Object.keys(sortedParams)
-    .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
-    .join('&');
-  console.log("[VNPay] signData:", signData);
-
-  const hmac = crypto.createHmac('sha512', secretKey);
-  const signed = hmac.update(signData, 'utf-8').digest('hex');
-
-  vnpParams['vnp_SecureHash'] = signed;
-  vnpUrl += '?' + Object.keys(vnpParams)
-    .map(key => `${key}=${encodeURIComponent(vnpParams[key]).replace(/%20/g, '+')}`)
-    .join('&');
-
-  console.log("[VNPay] Generated payment URL:", vnpUrl);
-
-  return {
-    payUrl: vnpUrl,
-    transactionId: transactionId
-  };
-}
-
-  // Xử lý callback từ VNPay
   async handleCallback(req, res) {
     const vnpParams = req.query;
     console.log("[VNPay] Callback received params:", JSON.stringify(vnpParams));
@@ -130,19 +133,17 @@ class VNPayService {
     }
 
     const transactionId = vnpParams['vnp_TxnRef'];
-    const amount = vnpParams['vnp_Amount'] / 100; // VNPay trả về số tiền đã nhân 100
+    const amount = vnpParams['vnp_Amount'] / 100;
     const responseCode = vnpParams['vnp_ResponseCode'];
     const transDate = vnpParams['vnp_PayDate'];
 
     try {
-      // Tìm payment record
       const payment = await Payment.findOne({ transactionId });
       if (!payment) {
         console.error("[VNPay] Payment not found:", transactionId);
         return res.redirect(`${this.config.returnUrl}?status=failed&message=Payment%20not%20found`);
       }
 
-      // Tìm booking tương ứng
       const booking = await Booking.findById(payment.bookingId);
       if (!booking) {
         console.error("[VNPay] Booking not found for payment:", payment.bookingId);
@@ -150,7 +151,6 @@ class VNPayService {
       }
 
       if (responseCode === '00') {
-        // Thanh toán thành công
         payment.status = 'completed';
         payment.vpnTransId = vnpParams['vnp_TransactionNo'];
         await payment.save();
@@ -162,7 +162,6 @@ class VNPayService {
         console.log(`[VNPay] Payment ${transactionId} completed successfully`);
         return res.redirect(`${this.config.returnUrl}?status=success&bookingId=${booking._id}`);
       } else {
-        // Thanh toán thất bại
         payment.status = 'failed';
         await payment.save();
 
@@ -175,7 +174,6 @@ class VNPayService {
     }
   }
 
-  // Kiểm tra trạng thái thanh toán
   async verifyPayment(transactionId) {
     try {
       const payment = await Payment.findOne({ transactionId });
@@ -201,7 +199,6 @@ class VNPayService {
     }
   }
 
-  // Hoàn tiền
   async refundPayment(booking) {
     try {
       console.log(`Bắt đầu hoàn tiền cho booking ${booking._id}`);
@@ -216,17 +213,15 @@ class VNPayService {
         return false;
       }
 
-      // Cập nhật trạng thái payment thành đang xử lý hoàn tiền
       payment.status = 'refunding';
       await payment.save();
 
-      // Tạo dữ liệu hoàn tiền
       const date = new Date();
       const vnp_RequestId = moment(date).format('HHmmss');
       const vnp_Version = '2.1.0';
       const vnp_Command = 'refund';
       const vnp_TmnCode = this.config.vnpTmnCode;
-      const vnp_TransactionType = '02'; // 02: Hoàn tiền toàn phần
+      const vnp_TransactionType = '02';
       const vnp_TxnRef = payment.transactionId;
       const vnp_Amount = Math.round(payment.amount * 100);
       const vnp_TransactionNo = payment.vpnTransId;
@@ -236,7 +231,6 @@ class VNPayService {
       const vnp_IpAddr = '127.0.0.1';
       const vnp_CreateDate = moment(date).format('YYYYMMDDHHmmss');
 
-      // Tạo chuỗi ký
       const data = vnp_RequestId + "|" + vnp_Version + "|" + vnp_Command + "|" + vnp_TmnCode + "|" +
         vnp_TransactionType + "|" + vnp_TxnRef + "|" + vnp_Amount + "|" + vnp_TransactionNo + "|" +
         vnp_TransactionDate + "|" + vnp_CreateBy + "|" + vnp_CreateDate + "|" + vnp_IpAddr + "|" + vnp_OrderInfo;
@@ -246,7 +240,6 @@ class VNPayService {
       const hmac = crypto.createHmac('sha512', this.config.vnpHashSecret);
       const vnp_SecureHash = hmac.update(data, 'utf-8').digest('hex');
 
-      // Tạo request hoàn tiền
       const dataObj = {
         vnp_RequestId,
         vnp_Version,
@@ -267,7 +260,6 @@ class VNPayService {
       console.log('[VNPay] Refund request data:', JSON.stringify(dataObj));
 
       try {
-        // Gửi request hoàn tiền đến VNPay
         const response = await axios.post(this.config.vnpRefundUrl, dataObj, {
           headers: { 'Content-Type': 'application/json' }
         });
@@ -275,14 +267,12 @@ class VNPayService {
         console.log('[VNPay] Refund response:', response.data);
 
         if (response.data.vnp_ResponseCode === '00') {
-          // Hoàn tiền thành công
           payment.status = 'refunded';
           payment.refundTransactionId = response.data.vnp_TransactionNo;
           payment.refundTimestamp = new Date();
           payment.refundAmount = payment.amount;
           await payment.save();
 
-          // Cập nhật trạng thái booking
           booking.status = 'cancelled';
           booking.cancelledAt = new Date();
           booking.cancellationReason = 'user_requested';
@@ -291,7 +281,6 @@ class VNPayService {
           console.log(`Hoàn tiền thành công cho booking ${booking._id}`);
           return true;
         } else {
-          // Hoàn tiền thất bại
           payment.status = 'refund_failed';
           payment.refundFailReason = response.data.vnp_ResponseMessage;
           await payment.save();
@@ -312,7 +301,6 @@ class VNPayService {
     }
   }
 
-  // Kiểm tra trạng thái hoàn tiền
   async checkRefundStatus(refundTransactionId) {
     try {
       const payment = await Payment.findOne({ refundTransactionId });
@@ -323,59 +311,6 @@ class VNPayService {
         };
       }
 
-      // Sandbox VNPay thường không có API kiểm tra hoàn tiền thực
-      /*
-      const tmnCode = this.config.vnpTmnCode;
-      const secretKey = this.config.vnpHashSecret;
-      const vnpApi = this.config.vnpRefundUrl;
-      
-      const date = new Date();
-      const createDate = date.getFullYear() +
-        ('0' + (date.getMonth() + 1)).slice(-2) +
-        ('0' + date.getDate()).slice(-2) +
-        ('0' + date.getHours()).slice(-2) +
-        ('0' + date.getMinutes()).slice(-2) +
-        ('0' + date.getSeconds()).slice(-2);
-      
-      const vnpParams = {
-        vnp_Version: '2.1.0',
-        vnp_Command: 'querydr',
-        vnp_TmnCode: tmnCode,
-        vnp_TxnRef: refundTransactionId,
-        vnp_OrderInfo: `Kiem tra hoan tien #${payment.bookingId}`,
-        vnp_TransactionDate: createDate,
-        vnp_CreateDate: createDate,
-        vnp_IpAddr: '127.0.0.1'
-      };
-      
-      const sortedParams = this.sortObject(vnpParams);
-      const signData = querystring.stringify(sortedParams, { encode: false });
-      const hmac = crypto.createHmac('sha512', secretKey);
-      const signed = hmac.update(new Buffer.from(signData, 'utf-8')).digest('hex');
-      
-      vnpParams['vnp_SecureHash'] = signed;
-      
-      const response = await axios.post(vnpApi, vnpParams, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-      });
-      
-      if (response.data.vnp_ResponseCode === '00') {
-        return {
-          success: true,
-          status: 'completed',
-          refundTransactionId: refundTransactionId,
-          refundAmount: payment.refundAmount || payment.amount,
-          refundTimestamp: payment.refundTimestamp
-        };
-      } else {
-        return {
-          success: false,
-          message: response.data.vnp_ResponseMessage
-        };
-      }
-      */
-
-      // Trong môi trường sandbox, trả về trạng thái từ database
       return {
         success: true,
         status: payment.status,
@@ -392,7 +327,6 @@ class VNPayService {
     }
   }
 
-  // Hàm sắp xếp object theo key
   sortObject(obj) {
     const sorted = {};
     const keys = Object.keys(obj).sort();
