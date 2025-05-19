@@ -665,9 +665,10 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     if (roomType) {
       roomQuery.roomType = roomType;
     }
-    if (amenities) {
+if (amenities) {
       const amenitiesArray = Array.isArray(amenities) ? amenities : amenities.split(',');
-      roomQuery.amenities = { $all: amenitiesArray };
+      const objectIds = amenitiesArray.map(id => new mongoose.Types.ObjectId(id));
+      roomQuery.amenities = { $all: objectIds };
     }
 
     // Sort options
@@ -706,6 +707,7 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
           images: room.hotelId.images,
           featuredImage: room.hotelId.featuredImage,
           policies: room.hotelId.policies,
+          amenities: room.hotelId.amenities,
           lowestPrice: room.hotelId.lowestPrice,
           lowestDiscountedPrice: room.hotelId.lowestDiscountedPrice,
           highestDiscountPercent: room.hotelId.highestDiscountPercent,
