@@ -1,4 +1,3 @@
-// utils/cloudinaryService.js
 const cloudinary = require('cloudinary').v2;
 
 // Cấu hình Cloudinary từ biến môi trường
@@ -9,8 +8,8 @@ cloudinary.config({
 });
 
 const uploadFromBuffer = async (file, folder = 'hotels') => {
-    // Đảm bảo folder là một trong ba loại cho phép
-    const allowedFolders = ['users', 'hotels', 'rooms'];
+    // Đảm bảo folder là một trong các loại cho phép
+    const allowedFolders = ['users', 'hotels', 'rooms', 'posts'];
     const targetFolder = allowedFolders.includes(folder) ? folder : 'others';
 
     return new Promise((resolve, reject) => {
@@ -58,7 +57,6 @@ const deleteMany = async (publicIds) => {
 // Tạo URL có biến đổi ảnh (resize, crop, etc.)
 const transformImage = (url, options = {}) => {
     if (!url) return null;
-
 
     // Phân tích URL gốc
     const baseUrl = url.split('/upload/')[0] + '/upload/';

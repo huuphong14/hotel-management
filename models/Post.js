@@ -17,7 +17,9 @@ const PostSchema = new mongoose.Schema({
     trim: true
   },
   images: [{
-    type: String
+    url: String,
+    publicId: String,
+    filename: String
   }],
   status: {
     type: String,
@@ -31,4 +33,4 @@ const PostSchema = new mongoose.Schema({
 // Tạo index cho tìm kiếm theo tiêu đề
 PostSchema.index({ title: 'text' });
 
-module.exports = mongoose.model('Post', PostSchema); 
+module.exports = mongoose.model('Post', PostSchema);

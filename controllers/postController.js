@@ -1,5 +1,6 @@
 const Post = require('../models/Post');
 const PostInteraction = require('../models/PostInteraction');
+const cloudinaryService = require('../config/cloudinaryService');
 
 // @desc    Tạo bài viết mới
 // @route   POST /api/posts
@@ -7,6 +8,13 @@ const PostInteraction = require('../models/PostInteraction');
 exports.createPost = async (req, res) => {
   try {
     req.body.userId = req.user.id;
+
+    let images = [];
+    if (req.files && req.files.length > 0) {
+      images = await cloudinaryService.uploadManyFromBuffer(req.files, 'posts');
+    }
+
+    req.body.images = images;
     const post = await Post.create(req.body);
 
     res.status(201).json({
@@ -14,9 +22,11 @@ exports.createPost = async (req, res) => {
       data: post
     });
   } catch (error) {
+    console.error('Create post error:', { message: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server',
+      error: error.message
     });
   }
 };
@@ -72,7 +82,7 @@ exports.getPost = async (req, res) => {
 
 // @desc    Cập nhật bài viết
 // @route   PUT /api/posts/:id
-// @access  Private
+// @access  Private (partner hoặc admin)
 exports.updatePost = async (req, res) => {
   try {
     let post = await Post.findById(req.params.id);
@@ -84,6 +94,7 @@ exports.updatePost = async (req, res) => {
       });
     }
 
+    // Kiểm tra quyền: chỉ chủ bài viết (partner) hoặc admin được phép cập nhật
     if (post.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -91,7 +102,92 @@ exports.updatePost = async (req, res) => {
       });
     }
 
-    post = await Post.findByIdAndUpdate(req.params.id, req.body, {
+    // Các trường được phép cập nhật
+    const allowedFields = ['title', 'content', 'status'];
+    const updateData = {};
+    Object.keys(req.body).forEach(key => {
+      if (allowedFields.includes(key)) {
+        updateData[key] = req.body[key];
+      }
+    });
+
+    // Xử lý hình ảnh
+    if (req.files && req.files.length > 0) {
+      try {
+        const newImages = await cloudinaryService.uploadManyFromBuffer(req.files, 'posts');
+        const imageAction = req.body.imageAction || 'add';
+        if (imageAction === 'replace') {
+          // Xóa tất cả hình ảnh cũ nếu có
+          if (post.images && post.images.length > 0) {
+            const publicIds = post.images
+              .map(img => img.publicId)
+              .filter(id => id && id.trim() !== '');
+            if (publicIds.length > 0) {
+              await cloudinaryService.deleteMany(publicIds);
+            }
+          }
+          updateData.images = newImages;
+        } else {
+          // Thêm hình ảnh mới vào danh sách hiện tại
+          updateData.images = [...(post.images || []), ...newImages];
+        }
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xử lý hình ảnh',
+          error: error.message
+        });
+      }
+    } else if (req.body.removeImages === 'true') {
+      try {
+        // Xóa tất cả hình ảnh
+        if (post.images && post.images.length > 0) {
+          const publicIds = post.images
+            .map(img => img.publicId)
+            .filter(id => id && id.trim() !== '');
+          if (publicIds.length > 0) {
+            await cloudinaryService.deleteMany(publicIds);
+          }
+        }
+        updateData.images = [];
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa hình ảnh',
+          error: error.message
+        });
+      }
+    } else if (req.body.removeImageIds) {
+      try {
+        let removeIds;
+        try {
+          removeIds = JSON.parse(req.body.removeImageIds);
+        } catch (e) {
+          removeIds = req.body.removeImageIds.split(',').map(id => id.trim());
+        }
+        if (removeIds && removeIds.length > 0) {
+          const publicIdsToRemove = post.images
+            .filter(img => removeIds.includes(img._id.toString()) || removeIds.includes(img.publicId))
+            .map(img => img.publicId)
+            .filter(id => id && id.trim() !== '');
+          if (publicIdsToRemove.length > 0) {
+            await cloudinaryService.deleteMany(publicIdsToRemove);
+          }
+          updateData.images = post.images.filter(img =>
+            !removeIds.includes(img._id.toString()) && !removeIds.includes(img.publicId)
+          );
+        }
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: 'Lỗi khi xóa ảnh cụ thể',
+          error: error.message
+        });
+      }
+    }
+
+    // Cập nhật bài viết
+    post = await Post.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true
     });
@@ -101,16 +197,18 @@ exports.updatePost = async (req, res) => {
       data: post
     });
   } catch (error) {
+    console.error('Update post error:', { message: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server',
+      error: error.message
     });
   }
 };
 
 // @desc    Xóa bài viết
 // @route   DELETE /api/posts/:id
-// @access  Private
+// @access  Private (partner hoặc admin)
 exports.deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -122,6 +220,7 @@ exports.deletePost = async (req, res) => {
       });
     }
 
+    // Kiểm tra quyền: chỉ chủ bài viết (partner) hoặc admin được phép xóa
     if (post.userId.toString() !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
@@ -129,6 +228,17 @@ exports.deletePost = async (req, res) => {
       });
     }
 
+    // Xóa hình ảnh trên Cloudinary nếu có
+    if (post.images && post.images.length > 0) {
+      const publicIds = post.images
+        .map(img => img.publicId)
+        .filter(id => id && id.trim() !== '');
+      if (publicIds.length > 0) {
+        await cloudinaryService.deleteMany(publicIds);
+      }
+    }
+
+    // Xóa bài viết và các tương tác liên quan
     await post.deleteOne();
     await PostInteraction.deleteMany({ postId: req.params.id });
 
@@ -137,9 +247,11 @@ exports.deletePost = async (req, res) => {
       message: 'Bài viết đã được xóa'
     });
   } catch (error) {
+    console.error('Delete post error:', { message: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: 'Lỗi server',
+      error: error.message
     });
   }
 };
@@ -229,4 +341,4 @@ exports.deleteInteraction = async (req, res) => {
       message: 'Lỗi server'
     });
   }
-}; 
+};
