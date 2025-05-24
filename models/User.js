@@ -33,16 +33,16 @@ const UserSchema = new mongoose.Schema({
     select: false
   },
   avatar: {
-    type: [{
+    type: {
       url: String,
       publicId: String,
       filename: String
-    }],
-    default: [{
+    },
+    default: {
       url: 'https://res.cloudinary.com/dssrbosuv/image/upload/v1728055710/samples/man-portrait.jpg',
       publicId: 'default_avatar',
       filename: 'default-avatar.jpg'
-    }]
+    }
   },
   role: {
     type: String,

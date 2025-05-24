@@ -10,11 +10,12 @@ const sendEmail = async (options) => {
     }
   });
 
-  const mailOptions = {
+const mailOptions = {
     from: `${config.emailFrom} <${config.emailUsername}>`,
     to: options.email,
     subject: options.subject,
-    html: options.message
+    html: options.message,
+    attachments: options.attachments || [] 
   };
 
   await transporter.sendMail(mailOptions);

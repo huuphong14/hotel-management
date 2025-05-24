@@ -23,12 +23,13 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const voucherRoutes = require('./routes/voucherRoutes');
-const amenityRoute = require('./routes/amenityRoute');
+const amenityRoute = require('./routes/amenityroute');
 const favoriteRoutes = require('./routes/favoriteRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const statisticsRoutes = require('./routes/statisticsRoutes');
 const adminStatisticsRoutes = require('./routes/adminStatisticsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const webhook = require('./routes/webhook');
 
 // Khởi tạo express
 const app = express();
@@ -121,6 +122,7 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin-statistics', adminStatisticsRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/webhook', webhook);
 
 // Route mặc định
 app.get('/', (req, res) => {

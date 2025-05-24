@@ -13,9 +13,9 @@ const { validateVoucher } = require('../services/voucherService');
 const RoomService = require('../services/roomService')
 const { recordRetryFailure } = require('../utils/monitoring');
 
-// @desc    Tạo booking mới
-// @route   POST /api/bookings
-// @access  Private
+/// @desc    Tạo booking mới
+/// @route   POST /api/bookings
+/// @access  Private
 exports.createBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -151,28 +151,52 @@ exports.createBooking = async (req, res) => {
 
     // Populate booking details
     await booking.populate([
-      { path: 'voucher', select: 'code discount discountType' }
+      { path: 'voucher', select: 'code discount discountType' },
+      { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
+      { path: 'user', select: 'name email' }
     ]);
 
-    // CreateIt notification
+    console.log('Booking sau populate:', {
+      roomId: booking.room?._id,
+      hotelName: booking.room?.hotelId?.name,
+      hotelAddress: booking.room?.hotelId?.address,
+    });
+
+    // Create notification
     await NotificationService.createBookingNotification(booking);
 
     // Send confirmation email
-    const hotelName = room.hotelId ? room.hotelId.name : 'Khách sạn';
+    const hotelName = booking.room?.hotelId?.name || 'Khách sạn';
+    const hotelAddress = booking.room?.hotelId?.address || 'Không xác định';
+    console.log('Booking trước tạo message:', {
+      hotelName,
+      hotelAddress,
+    });
+
+    const formattedPaymentMethod =
+      paymentMethod === 'zalopay'
+        ? 'ZaloPay'
+        : paymentMethod === 'vnpay'
+        ? 'VNPay'
+        : paymentMethod === 'credit_card'
+        ? 'Thẻ tín dụng'
+        : 'PayPal';
+
     const message = `
       <h1>Xác nhận đặt phòng</h1>
       <p>Thông tin đặt phòng:</p>
       <ul>
         <li>Khách sạn: ${hotelName}</li>
-        <li>Loại phòng: ${room.roomType}</li>
-        <li>Ngày check-in: ${checkIn}</li>
-        <li>Ngày check-out: ${checkOut}</li>
+        <li>Địa chỉ: ${hotelAddress}</li>
+        <li>Loại phòng: ${booking.room?.type || 'Không xác định'}</li>
+        <li>Ngày check-in: ${new Date(booking.checkIn).toLocaleDateString('vi-VN')}</li>
+        <li>Ngày check-out: ${new Date(booking.checkOut).toLocaleDateString('vi-VN')}</li>
         <li>Số đêm: ${numberOfDays}</li>
-        <li>Giá gốc: ${originalPrice.toLocaleString()}đ</li>
+        <li>Giá gốc: ${booking.originalPrice.toLocaleString('vi-VN')}đ</li>
         ${booking.voucher ? `<li>Mã giảm giá: ${booking.voucher.code}</li>` : ''}
-        ${booking.discountAmount > 0 ? `<li>Giảm giá: ${booking.discountAmount.toLocaleString()}đ</li>` : ''}
-        <li>Tổng thanh toán: ${booking.finalPrice.toLocaleString()}đ</li>
-        <li>Phương thức thanh toán: ${paymentMethod === 'zalopay' ? 'ZaloPay' : 'VNPay'}</li>
+        ${booking.discountAmount > 0 ? `<li>Giảm giá: ${booking.discountAmount.toLocaleString('vi-VN')}đ</li>` : ''}
+        <li>Tổng thanh toán: ${booking.finalPrice.toLocaleString('vi-VN')}đ</li>
+        <li>Phương thức thanh toán: ${formattedPaymentMethod}</li>
       </ul>
       
       <h2>Thông tin liên hệ:</h2>
@@ -203,11 +227,18 @@ exports.createBooking = async (req, res) => {
       <p>Trạng thái: Chờ xác nhận</p>
     `;
 
-    await sendEmail({
-      email: contactInfo.email,
-      subject: 'Xác nhận đặt phòng',
-      message
-    });
+    try {
+      console.log('Sending email to:', contactInfo.email);
+      await sendEmail({
+        email: contactInfo.email,
+        subject: 'Xác nhận đặt phòng',
+        message
+      });
+      console.log('Email sent successfully');
+    } catch (emailError) {
+      console.error('Lỗi gửi email xác nhận đặt phòng:', emailError.message, emailError.stack);
+      // Log lỗi nhưng không làm gián đoạn quá trình tạo booking
+    }
 
     // Generate payment URL
     let paymentUrl;

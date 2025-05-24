@@ -6,6 +6,8 @@ const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
+const { getInvoiceTemplate } = require('../utils/invoiceTemplate');
+const { generatePDF } = require('../utils/generatePDF');
 
 class ZaloPayService {
   static config = {
@@ -82,11 +84,11 @@ class ZaloPayService {
 
     const orderData = {
       app_id: Number(this.config.appId),
-      app_user: booking.user._id ? booking.user._id.toString() : booking.user.toString(), // Chỉ lấy _id
+      app_user: booking.user._id ? booking.user._id.toString() : booking.user.toString(),
       app_trans_id: transactionId,
       app_time: Date.now(),
       item: JSON.stringify([{
-        itemid: booking.room._id ? booking.room._id.toString() : booking.room.toString(), // Chỉ lấy _id
+        itemid: booking.room._id ? booking.room._id.toString() : booking.room.toString(),
         itemname: 'Room Booking',
         itemprice: amount,
         itemquantity: 1
@@ -137,6 +139,7 @@ class ZaloPayService {
       throw new Error(`Không thể tạo liên kết thanh toán: ${error.response?.data?.return_message || error.message}`);
     }
   }
+
   static async refundPayment(booking) {
     console.log(`=== STARTING REFUND PROCESS FOR BOOKING ${booking._id} ===`);
 
@@ -500,7 +503,12 @@ class ZaloPayService {
         console.log('Payment status updated successfully');
 
         console.log('Fetching booking with ID:', bookingId);
-        const booking = await Booking.findById(bookingId);
+        const booking = await Booking.findById(bookingId)
+          .populate([
+            { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
+            { path: 'user', select: 'name email' },
+            { path: 'voucher', select: 'code discount discountType' }
+          ]);
 
         if (booking) {
           console.log('Found booking:', JSON.stringify(booking));
@@ -608,7 +616,13 @@ class ZaloPayService {
                 await payment.save();
                 console.log("Đã cập nhật trạng thái thanh toán:", payment);
 
-                const booking = await Booking.findById(payment.bookingId);
+                const booking = await Booking.findById(payment.bookingId)
+                  .populate([
+                    { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
+                    { path: 'user', select: 'name email' },
+                    { path: 'voucher', select: 'code discount discountType' }
+                  ]);
+
                 console.log("Thông tin đặt phòng trước khi cập nhật:", booking);
 
                 if (booking) {
@@ -645,13 +659,20 @@ class ZaloPayService {
             payment.status = 'completed';
             await payment.save();
 
-            const booking = await Booking.findById(payment.bookingId);
+            const booking = await Booking.findById(payment.bookingId)
+              .populate([
+                { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
+                { path: 'user', select: 'name email' },
+                { path: 'voucher', select: 'code discount discountType' }
+              ]);
+
             if (booking) {
               booking.status = 'confirmed';
               booking.paymentStatus = 'paid';
               await booking.save();
             }
 
+            await this.sendPaymentConfirmation(booking, payment);
             return res.redirect(`/booking-success/${payment.bookingId}`);
           }
         }
@@ -667,9 +688,11 @@ class ZaloPayService {
 
   static async sendPaymentConfirmation(booking, payment) {
     try {
+      // Ensure booking is populated with necessary data
       await booking.populate([
-        { path: 'room', select: 'name type price' },
-        { path: 'user', select: 'name email' }
+        { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
+        { path: 'user', select: 'name email' },
+        { path: 'voucher', select: 'code discount discountType' }
       ]);
 
       await NotificationService.createNotification({
@@ -681,6 +704,31 @@ class ZaloPayService {
         relatedId: booking._id
       });
 
+      // Tạo HTML hóa đơn
+      const htmlContent = getInvoiceTemplate({
+        _id: booking._id,
+        room: booking.room,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        originalPrice: booking.originalPrice,
+        discountAmount: booking.discountAmount,
+        finalPrice: booking.finalPrice,
+        paymentMethod: booking.paymentMethod,
+        contactInfo: booking.contactInfo,
+        guestInfo: booking.guestInfo,
+        specialRequests: booking.specialRequests,
+        bookingFor: booking.bookingFor,
+        hotel: booking.room?.hotelId,
+      });
+
+      // Tạo PDF
+      let pdfBuffer;
+      try {
+        pdfBuffer = await generatePDF(htmlContent);
+      } catch (pdfError) {
+        console.error('Lỗi khi tạo PDF hóa đơn:', pdfError.message);
+      }
+
       const message = `
         <h1>Xác nhận thanh toán</h1>
         <p>Xin chào ${booking.user.name},</p>
@@ -688,22 +736,36 @@ class ZaloPayService {
         <p>Thông tin thanh toán:</p>
         <ul>
           <li>Mã đơn: ${booking._id}</li>
-          <li>Phòng: ${booking.room.name}</li>
-          <li>Số tiền: ${payment.amount.toLocaleString()}đ</li>
+          <li>Khách sạn: ${booking.room?.hotelId?.name || 'Không xác định'}</li>
+          <li>Phòng: ${booking.room?.name || booking.room?.type || 'Không xác định'}</li>
+          <li>Số tiền: ${payment.amount.toLocaleString('vi-VN')}đ</li>
           <li>Mã giao dịch: ${payment.transactionId}</li>
           <li>Trạng thái: Đã thanh toán</li>
         </ul>
+        <p>Hóa đơn chi tiết đã được đính kèm dưới dạng PDF.</p>
         <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>
       `;
 
-      await sendEmail({
-        email: booking.user.email,
-        subject: 'Xác nhận thanh toán thành công',
-        message
-      });
+      // Gửi email với PDF đính kèm
+      try {
+        await sendEmail({
+          email: booking.user.email,
+          subject: 'Xác nhận thanh toán thành công',
+          message,
+          attachments: pdfBuffer ? [
+            {
+              filename: `invoice-${booking._id}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ] : [],
+        });
+      } catch (emailError) {
+        console.error('Lỗi gửi email xác nhận thanh toán:', emailError.message);
+      }
 
     } catch (error) {
-      console.error('Lỗi gửi thông báo xác nhận thanh toán:', error);
+      console.error('Lỗi gửi thông báo xác nhận thanh toán:', error.message);
     }
   }
 
@@ -730,7 +792,7 @@ class ZaloPayService {
         <p>Thông tin hoàn tiền:</p>
         <ul>
           <li>Mã đơn: ${booking._id}</li>
-          <li>Số tiền hoàn: ${payment.amount.toLocaleString()}đ</li>
+          <li>Số tiền hoàn: ${payment.amount.toLocaleString('vi-VN')}đ</li>
           <li>Mã giao dịch: ${payment.transactionId}</li>
           <li>Trạng thái: Đã hoàn tiền</li>
         </ul>

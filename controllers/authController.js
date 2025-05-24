@@ -315,8 +315,10 @@ exports.verifyOTP = async (req, res) => {
 exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, password } = req.body;
+    console.log('[RESET PASSWORD] Received request:', { email, otp, password: password ? '***' : undefined });
 
     if (!email || !otp || !password) {
+      console.warn('[RESET PASSWORD] Missing required fields');
       return res.status(400).json({
         success: false,
         message: 'Vui lòng cung cấp email, OTP và mật khẩu mới'
@@ -328,6 +330,8 @@ exports.resetPassword = async (req, res) => {
       .update(String(otp).trim())
       .digest('hex');
 
+    console.log('[RESET PASSWORD] Generated reset token:', resetPasswordToken);
+
     const user = await User.findOne({
       email,
       resetPasswordToken,
@@ -335,6 +339,7 @@ exports.resetPassword = async (req, res) => {
     });
 
     if (!user) {
+      console.warn('[RESET PASSWORD] Không tìm thấy người dùng hoặc OTP đã hết hạn');
       return res.status(400).json({
         success: false,
         message: 'Mã OTP không hợp lệ hoặc đã hết hạn'
@@ -344,13 +349,16 @@ exports.resetPassword = async (req, res) => {
     user.password = password;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
+
     await user.save();
+    console.log('[RESET PASSWORD] Password reset thành công cho user:', email);
 
     res.status(200).json({
       success: true,
       message: 'Đặt lại mật khẩu thành công'
     });
   } catch (error) {
+    console.error('[RESET PASSWORD] Server error:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi server'
@@ -405,7 +413,7 @@ exports.googleCallback = async (req, res) => {
     res.cookie('token', token, { httpOnly: true });
     res.cookie('refreshToken', refreshToken, { httpOnly: true });
 
-    res.redirect(`${config.clientUrl}/dashboard?token=${token}`);
+    res.redirect(`${config.clientUrl}/oauth?token=${token}`);
   } catch (error) {
     console.error('Google Callback error:', error);
     res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);
@@ -459,7 +467,7 @@ exports.facebookCallback = async (req, res) => {
     res.cookie('token', token, { httpOnly: true });
     res.cookie('refreshToken', refreshToken, { httpOnly: true });
 
-    res.redirect(`${config.clientUrl}/dashboard?token=${token}`);
+    res.redirect(`${config.clientUrl}/oauth?token=${token}`);
   } catch (error) {
     console.error('Facebook Callback error:', error);
     res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);

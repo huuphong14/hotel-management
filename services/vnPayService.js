@@ -4,6 +4,9 @@ const querystring = require('querystring');
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
 const moment = require('moment');
+const { getInvoiceTemplate } = require('../utils/invoiceTemplate');
+const { generatePDF } = require('../utils/generatePDF');
+const sendEmail = require('../utils/sendEmail');
 
 class VNPayService {
   constructor() {
@@ -36,7 +39,7 @@ class VNPayService {
       ('0' + date.getMinutes()).slice(-2) +
       ('0' + date.getSeconds()).slice(-2);
 
-     const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
+    const transactionId = `B${booking._id.toString().slice(-8)}_${Date.now()}`;
 
     // Làm sạch các giao dịch cũ
     await Payment.updateMany(
@@ -115,7 +118,7 @@ class VNPayService {
       payUrl: vnpUrl,
       transactionId: transactionId
     };
-  } catch (error) {
+  } catch(error) {
     console.error('[VNPay] Payment URL creation error:', error.response?.data || error.message);
     throw new Error(`Không thể tạo liên kết thanh toán: ${error.response?.data?.message || error.message}`);
   }
@@ -135,7 +138,6 @@ class VNPayService {
     const transactionId = vnpParams['vnp_TxnRef'];
     const amount = vnpParams['vnp_Amount'] / 100;
     const responseCode = vnpParams['vnp_ResponseCode'];
-    const transDate = vnpParams['vnp_PayDate'];
 
     try {
       const payment = await Payment.findOne({ transactionId });
@@ -144,7 +146,12 @@ class VNPayService {
         return res.redirect(`${this.config.returnUrl}?status=failed&message=Payment%20not%20found`);
       }
 
-      const booking = await Booking.findById(payment.bookingId);
+      const booking = await Booking.findById(payment.bookingId)
+        .populate([
+          { path: 'room', select: 'name hotelId', populate: { path: 'hotelId', select: 'name address' } },
+          { path: 'user', select: 'name email' },
+        ]);
+
       if (!booking) {
         console.error("[VNPay] Booking not found for payment:", payment.bookingId);
         return res.redirect(`${this.config.returnUrl}?status=failed&message=Booking%20not%20found`);
@@ -159,6 +166,53 @@ class VNPayService {
         booking.status = 'confirmed';
         await booking.save();
 
+        // Tạo và gửi PDF
+        const htmlContent = getInvoiceTemplate({
+          _id: booking._id,
+          room: booking.room,
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+          originalPrice: booking.originalPrice,
+          discountAmount: booking.discountAmount,
+          finalPrice: booking.finalPrice,
+          paymentMethod: booking.paymentMethod,
+          contactInfo: booking.contactInfo,
+          guestInfo: booking.guestInfo,
+          specialRequests: booking.specialRequests,
+          hotel: booking.room?.hotelId,
+        });
+
+        const pdfBuffer = await generatePDF(htmlContent);
+
+        const message = `
+        <h1>Xác nhận thanh toán</h1>
+        <p>Xin chào ${booking.user.name},</p>
+        <p>Chúng tôi xác nhận đã nhận được thanh toán của bạn cho đơn đặt phòng.</p>
+        <p>Thông tin thanh toán:</p>
+        <ul>
+          <li>Mã đơn: ${booking._id}</li>
+          <li>Khách sạn: ${booking.room?.hotelId?.name || 'Không xác định'}</li>
+          <li>Số tiền: ${amount.toLocaleString('vi-VN')}đ</li>
+          <li>Mã giao dịch: ${transactionId}</li>
+          <li>Trạng thái: Đã thanh toán</li>
+        </ul>
+        <p>Hóa đơn chi tiết đã được đính kèm dưới dạng PDF.</p>
+        <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>
+      `;
+
+        await sendEmail({
+          email: booking.user.email,
+          subject: 'Xác nhận thanh toán thành công',
+          message,
+          attachments: [
+            {
+              filename: `invoice-${booking._id}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf',
+            },
+          ],
+        });
+
         console.log(`[VNPay] Payment ${transactionId} completed successfully`);
         return res.redirect(`${this.config.returnUrl}?status=success&bookingId=${booking._id}`);
       } else {
@@ -172,6 +226,22 @@ class VNPayService {
       console.error("[VNPay] Error processing callback:", error);
       return res.redirect(`${this.config.returnUrl}?status=error&message=Server%20error`);
     }
+  }
+
+  verifyReturnUrl(vnpParams) {
+    const secureHash = vnpParams['vnp_SecureHash'];
+    delete vnpParams['vnp_SecureHash'];
+    delete vnpParams['vnp_SecureHashType'];
+
+    const sortedParams = this.sortObject(vnpParams);
+    const signData = Object.keys(sortedParams)
+      .map(key => `${key}=${encodeURIComponent(sortedParams[key]).replace(/%20/g, '+')}`)
+      .join('&');
+
+    const hmac = crypto.createHmac('sha512', this.config.vnpHashSecret);
+    const signed = hmac.update(signData, 'utf-8').digest('hex');
+
+    return secureHash === signed;
   }
 
   async verifyPayment(transactionId) {
