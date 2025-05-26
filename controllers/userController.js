@@ -245,7 +245,7 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
   
   // Kiểm tra xem người dùng có booking đang hoạt động không
   const activeBookings = await Booking.find({
-    userId: user._id,
+    user: user._id,
     status: { $in: ['pending', 'confirmed', 'checked_in'] }
   });
   

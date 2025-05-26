@@ -162,7 +162,8 @@ exports.updateReview = async (req, res) => {
         runValidators: true
       }
     );
-
+    await Review.calculateAverageRating(review.hotelId)
+    
     console.log(`Cập nhật đánh giá ${req.params.id} thành công bởi người dùng: ${req.user.id}`);
     res.status(200).json({
       success: true,
@@ -249,7 +250,8 @@ exports.deleteReview = async (req, res) => {
     }
 
     // Xóa đánh giá khỏi cơ sở dữ liệu
-    await review.remove();
+    review.deleteOne()
+    Review.calculateAverageRating(review.hotelId)
     console.log(`Xóa đánh giá với ID: ${req.params.id} thành công`);
 
     res.status(200).json({
