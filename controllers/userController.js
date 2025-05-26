@@ -108,11 +108,11 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
     }
     
     // Cập nhật avatar mới trong DB
-    user.avatar = [{
+    user.avatar = {
       url: uploadResult.url,
       publicId: uploadResult.publicId,
       filename: uploadResult.filename
-    }];
+    };
     
     await user.save();
     
