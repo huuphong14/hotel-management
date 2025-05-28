@@ -342,3 +342,14 @@ exports.deleteInteraction = async (req, res) => {
     });
   }
 };
+
+// @route   POST /api/uploads/tinymce
+exports.uploadTinyMCEImage = async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    const image = await cloudinaryService.uploadFromBuffer(req.file, "posts");
+    res.json({ location: image.url }); // TinyMCE expects { location: "url" }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

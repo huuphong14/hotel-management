@@ -30,6 +30,7 @@ const statisticsRoutes = require('./routes/statisticsRoutes');
 const adminStatisticsRoutes = require('./routes/adminStatisticsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const webhook = require('./routes/webhook');
+const upload  = require('./routes/upload')
 
 // Khởi tạo express
 const app = express();
@@ -123,6 +124,7 @@ app.use('/api/statistics', statisticsRoutes);
 app.use('/api/admin-statistics', adminStatisticsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/webhook', webhook);
+app.use('/upload', upload);
 
 // Route mặc định
 app.get('/', (req, res) => {

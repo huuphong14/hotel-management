@@ -413,7 +413,7 @@ exports.googleCallback = async (req, res) => {
     res.cookie('token', token, { httpOnly: true });
     res.cookie('refreshToken', refreshToken, { httpOnly: true });
 
-    res.redirect(`${config.clientUrl}/oauth?token=${token}`);
+    res.redirect(`${config.clientUrl}/oauth?token=${token}&refreshToken=${refreshToken}`);
   } catch (error) {
     console.error('Google Callback error:', error);
     res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);
@@ -467,7 +467,7 @@ exports.facebookCallback = async (req, res) => {
     res.cookie('token', token, { httpOnly: true });
     res.cookie('refreshToken', refreshToken, { httpOnly: true });
 
-    res.redirect(`${config.clientUrl}/oauth?token=${token}`);
+    res.redirect(`${config.clientUrl}/oauth?token=${token}&refreshToken=${refreshToken}`);
   } catch (error) {
     console.error('Facebook Callback error:', error);
     res.redirect(`${config.clientUrl}/login?error=server_error&message=${encodeURIComponent(error.message || 'Lỗi server')}`);
