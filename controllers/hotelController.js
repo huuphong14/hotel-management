@@ -1,83 +1,191 @@
-const Hotel = require('../models/Hotel');
-const cloudinaryService = require('../config/cloudinaryService');
-const Room = require('../models/Room');
-const Location = require('../models/Location');
-const RoomService = require('../services/roomService');
-const mongoose = require('mongoose');
-// @desc    Tạo khách sạn mới
-// @route   POST /api/hotels
-// @access  Private/Hotel Owner
+const Hotel = require("../models/Hotel");
+const cloudinaryService = require("../config/cloudinaryService");
+const Room = require("../models/Room");
+const Location = require("../models/Location");
+const RoomService = require("../services/roomService");
+const mongoose = require("mongoose");
+
+/**
+ * @swagger
+ * /api/hotels:
+ *   post:
+ *     summary: Tạo khách sạn mới
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - address
+ *               - locationId
+ *             properties:
+ *               name:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               locationId:
+ *                 type: string
+ *               featuredImage:
+ *                 type: string
+ *                 format: binary
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       201:
+ *         description: Tạo khách sạn thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.createHotel = async (req, res) => {
   try {
     req.body.ownerId = req.user.id;
-    
+
     // Upload ảnh đại diện lên cloud nếu có
-    if (req.files && req.files.featuredImage && req.files.featuredImage.length > 0) {
+    if (
+      req.files &&
+      req.files.featuredImage &&
+      req.files.featuredImage.length > 0
+    ) {
       const featuredImage = req.files.featuredImage[0];
-      req.body.featuredImage = await cloudinaryService.uploadFromBuffer(featuredImage);
+      req.body.featuredImage = await cloudinaryService.uploadFromBuffer(
+        featuredImage
+      );
     }
-    
+
     // Upload mảng ảnh lên cloud nếu có
     if (req.files && req.files.images && req.files.images.length > 0) {
-      req.body.images = await cloudinaryService.uploadManyFromBuffer(req.files.images);
+      req.body.images = await cloudinaryService.uploadManyFromBuffer(
+        req.files.images
+      );
     }
 
     const hotel = await Hotel.create(req.body);
 
     res.status(201).json({
       success: true,
-      data: hotel
+      data: hotel,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy danh sách khách sạn của người dùng đăng nhập
-// @route   GET /api/hotels/my-hotels
-// @access  Private (Partner)
+/**
+ * @swagger
+ * /api/hotels/my-hotels:
+ *   get:
+ *     summary: Lấy danh sách khách sạn của người dùng đăng nhập
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách khách sạn thành công
+ *       403:
+ *         description: Chỉ đối tác mới có thể xem danh sách khách sạn của mình
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getMyHotels = async (req, res) => {
   try {
     // Lấy ID của người dùng đang đăng nhập
     const userId = req.user.id;
-    
+
     // Kiểm tra nếu người dùng có vai trò partner
-    if (req.user.role !== 'partner') {
+    if (req.user.role !== "partner") {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ đối tác mới có thể xem danh sách khách sạn của mình'
+        message: "Chỉ đối tác mới có thể xem danh sách khách sạn của mình",
       });
     }
-    
+
     console.log(`Đang tìm kiếm khách sạn của đối tác ${userId}`);
-    
+
     // Tìm tất cả khách sạn mà người dùng sở hữu
-    const hotels = await Hotel.find({ ownerId: userId })
-      
+    const hotels = await Hotel.find({ ownerId: userId });
+
     console.log(`Đã tìm thấy ${hotels.length} khách sạn của đối tác`);
-    
+
     // Trả về kết quả
     res.status(200).json({
       success: true,
       count: hotels.length,
-      data: hotels
+      data: hotels,
     });
   } catch (error) {
-    console.error('Lỗi khi lấy danh sách khách sạn của đối tác:', error);
+    console.error("Lỗi khi lấy danh sách khách sạn của đối tác:", error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy danh sách khách sạn
-// @route   GET /api/hotels
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels:
+ *   get:
+ *     summary: Lấy danh sách khách sạn
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: query
+ *         name: name
+ *         schema:
+ *           type: string
+ *         description: Tên khách sạn
+ *       - in: query
+ *         name: locationId
+ *         schema:
+ *           type: string
+ *         description: ID địa điểm
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối thiểu
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối đa
+ *       - in: query
+ *         name: minDiscountPercent
+ *         schema:
+ *           type: number
+ *         description: Phần trăm giảm giá tối thiểu
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sắp xếp
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách khách sạn thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getHotels = async (req, res) => {
   try {
     const {
@@ -86,16 +194,16 @@ exports.getHotels = async (req, res) => {
       minPrice,
       maxPrice,
       minDiscountPercent, // Thêm tham số mới
-      sort = '-createdAt',
+      sort = "-createdAt",
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
     // Xây dựng query
     const query = {};
 
     if (name) {
-      query.name = { $regex: name, $options: 'i' };
+      query.name = { $regex: name, $options: "i" };
     }
 
     if (locationId) {
@@ -115,18 +223,18 @@ exports.getHotels = async (req, res) => {
     }
 
     // Áp dụng trạng thái
-    query.status = 'active';
+    query.status = "active";
 
     // Xây dựng tùy chọn sắp xếp
     let sortOption = sort;
-    if (sort === 'price') {
-      sortOption = 'lowestDiscountedPrice';
-    } else if (sort === '-price') {
-      sortOption = '-lowestDiscountedPrice';
-    } else if (sort === 'discount') {
-      sortOption = 'highestDiscountPercent';
-    } else if (sort === '-discount') {
-      sortOption = '-highestDiscountPercent';
+    if (sort === "price") {
+      sortOption = "lowestDiscountedPrice";
+    } else if (sort === "-price") {
+      sortOption = "-lowestDiscountedPrice";
+    } else if (sort === "discount") {
+      sortOption = "highestDiscountPercent";
+    } else if (sort === "-discount") {
+      sortOption = "-highestDiscountPercent";
     }
 
     // Tính toán pagination
@@ -134,8 +242,8 @@ exports.getHotels = async (req, res) => {
 
     // Thực hiện query
     const hotels = await Hotel.find(query)
-      .populate('ownerId', 'name email')
-      .populate('locationId', 'name')
+      .populate("ownerId", "name email")
+      .populate("locationId", "name")
       .sort(sortOption)
       .skip(skip)
       .limit(Number(limit));
@@ -144,9 +252,9 @@ exports.getHotels = async (req, res) => {
     const total = await Hotel.countDocuments(query);
 
     // Thêm thông tin giảm giá chi tiết vào kết quả
-    const hotelsWithDiscountDetails = hotels.map(hotel => {
+    const hotelsWithDiscountDetails = hotels.map((hotel) => {
       const hotelObj = hotel.toObject();
-      
+
       // Thêm thông tin về giảm giá
       if (hotel.highestDiscountPercent > 0) {
         hotelObj.hasDiscount = true;
@@ -159,7 +267,7 @@ exports.getHotels = async (req, res) => {
         hotelObj.originalPrice = hotel.lowestPrice;
         hotelObj.discountedPrice = hotel.lowestPrice;
       }
-      
+
       return hotelObj;
     });
 
@@ -169,51 +277,116 @@ exports.getHotels = async (req, res) => {
       total,
       pagination: {
         currentPage: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(total / Number(limit)),
       },
-      data: hotelsWithDiscountDetails
+      data: hotelsWithDiscountDetails,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy thông tin một khách sạn
-// @route   GET /api/hotels/:id
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels/{id}:
+ *   get:
+ *     summary: Lấy thông tin một khách sạn
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *     responses:
+ *       200:
+ *         description: Lấy thông tin khách sạn thành công
+ *       404:
+ *         description: Không tìm thấy khách sạn
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getHotel = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id)
-      .populate('ownerId', 'name email')
-      .populate('locationId', 'name');
+      .populate("ownerId", "name email")
+      .populate("locationId", "name");
 
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: hotel
+      data: hotel,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Cập nhật thông tin khách sạn
-// @route   PUT /api/hotels/:id
-// @access  Private/Hotel Owner, Admin
+/**
+ * @swagger
+ * /api/hotels/{id}:
+ *   put:
+ *     summary: Cập nhật thông tin khách sạn
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               address:
+ *                 type: string
+ *               locationId:
+ *                 type: string
+ *               featuredImage:
+ *                 type: string
+ *                 format: binary
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *               replaceAllImages:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 description: Thay thế toàn bộ ảnh cũ
+ *     responses:
+ *       200:
+ *         description: Cập nhật khách sạn thành công
+ *       403:
+ *         description: Không có quyền cập nhật khách sạn
+ *       404:
+ *         description: Không tìm thấy khách sạn
+ *       500:
+ *         description: Lỗi server
+ */
 exports.updateHotel = async (req, res) => {
   try {
     let hotel = await Hotel.findById(req.params.id);
@@ -221,50 +394,60 @@ exports.updateHotel = async (req, res) => {
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     // Kiểm tra quyền
-    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền cập nhật khách sạn này'
+        message: "Bạn không có quyền cập nhật khách sạn này",
       });
     }
 
     // Upload ảnh đại diện lên cloud nếu có
-    if (req.files && req.files.featuredImage && req.files.featuredImage.length > 0) {
+    if (
+      req.files &&
+      req.files.featuredImage &&
+      req.files.featuredImage.length > 0
+    ) {
       // Xóa ảnh cũ nếu có
       if (hotel.featuredImage && hotel.featuredImage.publicId) {
         await cloudinaryService.deleteFile(hotel.featuredImage.publicId);
       }
-      
+
       const featuredImage = req.files.featuredImage[0];
-      req.body.featuredImage = await cloudinaryService.uploadFromBuffer(featuredImage);
+      req.body.featuredImage = await cloudinaryService.uploadFromBuffer(
+        featuredImage
+      );
     }
-    
+
     // Xử lý mảng ảnh nếu có
     if (req.files && req.files.images && req.files.images.length > 0) {
       // Nếu muốn thay thế toàn bộ ảnh cũ
-      if (req.body.replaceAllImages === 'true') {
+      if (req.body.replaceAllImages === "true") {
         // Xóa tất cả ảnh cũ trên cloud
         if (hotel.images && hotel.images.length > 0) {
           const publicIds = hotel.images
-            .filter(img => img.publicId)
-            .map(img => img.publicId);
+            .filter((img) => img.publicId)
+            .map((img) => img.publicId);
           await cloudinaryService.deleteMany(publicIds);
         }
-        
+
         // Upload tất cả ảnh mới
-        req.body.images = await cloudinaryService.uploadManyFromBuffer(req.files.images);
+        req.body.images = await cloudinaryService.uploadManyFromBuffer(
+          req.files.images
+        );
       } else {
         // Nếu muốn thêm ảnh mới vào mảng ảnh hiện tại
-        const newImages = await cloudinaryService.uploadManyFromBuffer(req.files.images);
-        
+        const newImages = await cloudinaryService.uploadManyFromBuffer(
+          req.files.images
+        );
+
         // Lấy mảng ảnh hiện tại
         const currentImages = hotel.images || [];
-        
+
         // Gộp mảng ảnh mới và cũ
         req.body.images = [...currentImages, ...newImages];
       }
@@ -272,51 +455,89 @@ exports.updateHotel = async (req, res) => {
 
     hotel = await Hotel.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
-      runValidators: true
+      runValidators: true,
     });
 
     res.status(200).json({
       success: true,
-      data: hotel
+      data: hotel,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy danh sách khách sạn theo địa điểm
-// @route   GET /api/hotels/location/:locationId
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels/location/{locationId}:
+ *   get:
+ *     summary: Lấy danh sách khách sạn theo địa điểm
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: path
+ *         name: locationId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID địa điểm
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách khách sạn thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getHotelsByLocation = async (req, res) => {
   try {
-    const hotels = await Hotel.find({ 
+    const hotels = await Hotel.find({
       locationId: req.params.locationId,
-      status: 'active'
+      status: "active",
     })
-    .populate('locationId', 'name')
-    .populate('ownerId', 'name');
-    
+      .populate("locationId", "name")
+      .populate("ownerId", "name");
+
     res.status(200).json({
       success: true,
       count: hotels.length,
-      data: hotels
+      data: hotels,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Xóa khách sạn
-// @route   DELETE /api/hotels/:id
-// @access  Private/Hotel Owner
+/**
+ * @swagger
+ * /api/hotels/{id}:
+ *   delete:
+ *     summary: Xóa khách sạn
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *     responses:
+ *       200:
+ *         description: Xóa khách sạn thành công
+ *       403:
+ *         description: Không có quyền xóa khách sạn
+ *       404:
+ *         description: Không tìm thấy khách sạn
+ *       500:
+ *         description: Lỗi server
+ */
 exports.deleteHotel = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
@@ -324,15 +545,15 @@ exports.deleteHotel = async (req, res) => {
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     // Kiểm tra quyền
-    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền xóa khách sạn này'
+        message: "Bạn không có quyền xóa khách sạn này",
       });
     }
 
@@ -344,8 +565,8 @@ exports.deleteHotel = async (req, res) => {
     // Xóa tất cả ảnh trong mảng images
     if (hotel.images && hotel.images.length > 0) {
       const publicIds = hotel.images
-        .filter(img => img.publicId)
-        .map(img => img.publicId);
+        .filter((img) => img.publicId)
+        .map((img) => img.publicId);
       await cloudinaryService.deleteMany(publicIds);
     }
 
@@ -353,20 +574,56 @@ exports.deleteHotel = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Khách sạn đã được xóa'
+      message: "Khách sạn đã được xóa",
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Upload hình ảnh cho khách sạn
-// @route   POST /api/hotels/:id/images
-// @access  Private/Hotel Owner
+/**
+ * @swagger
+ * /api/hotels/{id}/images:
+ *   post:
+ *     summary: Upload hình ảnh cho khách sạn
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               images:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Upload hình ảnh thành công
+ *       400:
+ *         description: Vui lòng upload ít nhất một hình ảnh
+ *       403:
+ *         description: Không có quyền cập nhật khách sạn
+ *       404:
+ *         description: Không tìm thấy khách sạn
+ *       500:
+ *         description: Lỗi server
+ */
 exports.uploadHotelImages = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
@@ -374,22 +631,22 @@ exports.uploadHotelImages = async (req, res) => {
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     // Kiểm tra quyền
-    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền cập nhật khách sạn này'
+        message: "Bạn không có quyền cập nhật khách sạn này",
       });
     }
 
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng upload ít nhất một hình ảnh'
+        message: "Vui lòng upload ít nhất một hình ảnh",
       });
     }
 
@@ -405,20 +662,48 @@ exports.uploadHotelImages = async (req, res) => {
     res.status(200).json({
       success: true,
       count: hotel.images.length,
-      data: hotel.images
+      data: hotel.images,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Xóa một ảnh từ mảng images của khách sạn
-// @route   DELETE /api/hotels/:id/images/:imageIndex
-// @access  Private/Hotel Owner
+/**
+ * @swagger
+ * /api/hotels/{id}/images/{imageIndex}:
+ *   delete:
+ *     summary: Xóa một ảnh từ mảng images của khách sạn
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *       - in: path
+ *         name: imageIndex
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Vị trí ảnh trong mảng images
+ *     responses:
+ *       200:
+ *         description: Xóa hình ảnh thành công
+ *       403:
+ *         description: Không có quyền cập nhật khách sạn
+ *       404:
+ *         description: Không tìm thấy khách sạn hoặc hình ảnh
+ *       500:
+ *         description: Lỗi server
+ */
 exports.deleteHotelImage = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
@@ -426,56 +711,90 @@ exports.deleteHotelImage = async (req, res) => {
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     // Kiểm tra quyền
-    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền cập nhật khách sạn này'
+        message: "Bạn không có quyền cập nhật khách sạn này",
       });
     }
 
     const imageIndex = parseInt(req.params.imageIndex);
-    
+
     if (!hotel.images || imageIndex >= hotel.images.length || imageIndex < 0) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy hình ảnh'
+        message: "Không tìm thấy hình ảnh",
       });
     }
 
     // Lấy ảnh cần xóa
     const imageToDelete = hotel.images[imageIndex];
-    
+
     // Xóa ảnh trên Cloudinary
     if (imageToDelete.publicId) {
       await cloudinaryService.deleteFile(imageToDelete.publicId);
     }
-    
+
     // Xóa ảnh khỏi mảng
     hotel.images.splice(imageIndex, 1);
     await hotel.save();
-    
+
     res.status(200).json({
       success: true,
-      message: 'Đã xóa hình ảnh thành công',
-      data: hotel.images
+      message: "Đã xóa hình ảnh thành công",
+      data: hotel.images,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Cập nhật ảnh đại diện
-// @route   PUT /api/hotels/:id/featured-image
-// @access  Private/Hotel Owner
+/**
+ * @swagger
+ * /api/hotels/{id}/featured-image:
+ *   put:
+ *     summary: Cập nhật ảnh đại diện khách sạn
+ *     tags: [Hotel]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               featuredImage:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Cập nhật ảnh đại diện thành công
+ *       400:
+ *         description: Vui lòng upload hình ảnh
+ *       403:
+ *         description: Không có quyền cập nhật khách sạn
+ *       404:
+ *         description: Không tìm thấy khách sạn
+ *       500:
+ *         description: Lỗi server
+ */
 exports.updateFeaturedImage = async (req, res) => {
   try {
     const hotel = await Hotel.findById(req.params.id);
@@ -483,22 +802,22 @@ exports.updateFeaturedImage = async (req, res) => {
     if (!hotel) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn'
+        message: "Không tìm thấy khách sạn",
       });
     }
 
     // Kiểm tra quyền
-    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== 'admin') {
+    if (hotel.ownerId.toString() !== req.user.id && req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Bạn không có quyền cập nhật khách sạn này'
+        message: "Bạn không có quyền cập nhật khách sạn này",
       });
     }
 
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng upload hình ảnh'
+        message: "Vui lòng upload hình ảnh",
       });
     }
 
@@ -513,32 +832,57 @@ exports.updateFeaturedImage = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: hotel.featuredImage
+      data: hotel.featuredImage,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy danh sách khách sạn đang có giảm giá
-// @route   GET /api/hotels/discounts
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels/discounts:
+ *   get:
+ *     summary: Lấy danh sách khách sạn đang có giảm giá
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sắp xếp
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách khách sạn giảm giá thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getDiscountedHotels = async (req, res) => {
   try {
     const {
-      sort = '-highestDiscountPercent',
+      sort = "-highestDiscountPercent",
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
     // Tìm khách sạn có giảm giá
     const query = {
       highestDiscountPercent: { $gt: 0 },
-      status: 'active'
+      status: "active",
     };
 
     // Tính toán phân trang
@@ -546,8 +890,8 @@ exports.getDiscountedHotels = async (req, res) => {
 
     // Lấy thông tin khách sạn có giảm giá
     const hotels = await Hotel.find(query)
-      .populate('ownerId', 'name email')
-      .populate('locationId', 'name')
+      .populate("ownerId", "name email")
+      .populate("locationId", "name")
       .sort(sort)
       .skip(skip)
       .limit(Number(limit));
@@ -556,15 +900,15 @@ exports.getDiscountedHotels = async (req, res) => {
     const total = await Hotel.countDocuments(query);
 
     // Định dạng lại kết quả với thông tin chi tiết về giảm giá
-    const hotelsWithDiscountInfo = hotels.map(hotel => {
+    const hotelsWithDiscountInfo = hotels.map((hotel) => {
       const hotelObj = hotel.toObject();
-      
+
       hotelObj.hasDiscount = true;
       hotelObj.originalPrice = hotel.lowestPrice;
-      hotelObj.discountedPrice = hotel.lowestDiscountedPrice; 
+      hotelObj.discountedPrice = hotel.lowestDiscountedPrice;
       hotelObj.discountPercent = hotel.highestDiscountPercent;
       hotelObj.savingAmount = hotel.lowestPrice - hotel.lowestDiscountedPrice;
-      
+
       return hotelObj;
     });
 
@@ -574,23 +918,99 @@ exports.getDiscountedHotels = async (req, res) => {
       total,
       pagination: {
         currentPage: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(total / Number(limit)),
       },
-      data: hotelsWithDiscountInfo
+      data: hotelsWithDiscountInfo,
     });
   } catch (error) {
-    console.error('Chi tiết lỗi:', error);
+    console.error("Chi tiết lỗi:", error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server',
-      error: error.message
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
 
-// @desc    Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người
-// @route   GET /api/hotels/search
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels/search:
+ *   get:
+ *     summary: Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: query
+ *         name: locationName
+ *         schema:
+ *           type: string
+ *         description: Tên địa điểm
+ *       - in: query
+ *         name: checkIn
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày nhận phòng
+ *       - in: query
+ *         name: checkOut
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày trả phòng
+ *       - in: query
+ *         name: capacity
+ *         schema:
+ *           type: integer
+ *         description: Số người
+ *       - in: query
+ *         name: hotelName
+ *         schema:
+ *           type: string
+ *         description: Tên khách sạn (tùy chọn)
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối thiểu
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối đa
+ *       - in: query
+ *         name: roomType
+ *         schema:
+ *           type: string
+ *         description: Loại phòng
+ *       - in: query
+ *         name: amenities
+ *         schema:
+ *           type: string
+ *         description: Danh sách tiện ích (cách nhau bằng dấu phẩy)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sắp xếp
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Tìm kiếm khách sạn thành công
+ *       400:
+ *         description: Thiếu hoặc sai tham số
+ *       404:
+ *         description: Không tìm thấy khách sạn hoặc địa điểm
+ *       500:
+ *         description: Lỗi server
+ */
 exports.searchHotelsWithAvailableRooms = async (req, res) => {
   try {
     const {
@@ -603,16 +1023,17 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       maxPrice,
       roomType,
       amenities,
-      sort = 'price',
+      sort = "price",
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
     // Validate input
     if (!locationName || !checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người'
+        message:
+          "Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người",
       });
     }
 
@@ -621,64 +1042,68 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     if (isNaN(checkInDate) || isNaN(checkOutDate)) {
       return res.status(400).json({
         success: false,
-        message: 'Định dạng ngày không hợp lệ'
+        message: "Định dạng ngày không hợp lệ",
       });
     }
     if (checkInDate >= checkOutDate) {
       return res.status(400).json({
         success: false,
-        message: 'Ngày nhận phòng phải trước ngày trả phòng'
+        message: "Ngày nhận phòng phải trước ngày trả phòng",
       });
     }
 
     // Find location
     const location = await Location.findOne({
-      name: { $regex: locationName, $options: 'i' },
-      status: 'active'
+      name: { $regex: locationName, $options: "i" },
+      status: "active",
     });
     if (!location) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy địa điểm du lịch này'
+        message: "Không tìm thấy địa điểm du lịch này",
       });
     }
 
     // Find hotels
-    const hotelQuery = { locationId: location._id, status: 'active' };
+    const hotelQuery = { locationId: location._id, status: "active" };
     if (hotelName) {
-      hotelQuery.name = { $regex: hotelName, $options: 'i' };
+      hotelQuery.name = { $regex: hotelName, $options: "i" };
     }
-    const hotels = await Hotel.find(hotelQuery).select('_id');
-    const hotelIds = hotels.map(h => h._id);
+    const hotels = await Hotel.find(hotelQuery).select("_id");
+    const hotelIds = hotels.map((h) => h._id);
     if (hotelIds.length === 0) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn tại địa điểm này'
+        message: "Không tìm thấy khách sạn tại địa điểm này",
       });
     }
 
     // Build room query
     const roomQuery = {
       hotelId: { $in: hotelIds },
-      capacity: { $gte: Number(capacity) }
+      capacity: { $gte: Number(capacity) },
     };
     if (roomType) {
       roomQuery.roomType = roomType;
     }
-if (amenities) {
-      const amenitiesArray = Array.isArray(amenities) ? amenities : amenities.split(',');
-      const objectIds = amenitiesArray.map(id => new mongoose.Types.ObjectId(id));
+    if (amenities) {
+      const amenitiesArray = Array.isArray(amenities)
+        ? amenities
+        : amenities.split(",");
+      const objectIds = amenitiesArray.map(
+        (id) => new mongoose.Types.ObjectId(id)
+      );
       roomQuery.amenities = { $all: objectIds };
     }
 
     // Sort options
     const sortOptions = {};
-    if (sort === 'price') sortOptions.discountedPrice = 1;
-    else if (sort === '-price') sortOptions.discountedPrice = -1;
-    else if (sort === 'rating') sortOptions['hotelId.rating'] = 1;
-    else if (sort === '-rating') sortOptions['hotelId.rating'] = -1;
-    else if (sort === 'discountPercent') sortOptions.discountPercent = 1;
-    else if (sort === '-discountPercent') sortOptions.discountPercent = -1;
+    if (sort === "price") sortOptions.discountedPrice = 1;
+    else if (sort === "-price") sortOptions.discountedPrice = -1;
+    else if (sort === "rating") sortOptions["hotelId.rating"] = 1;
+    else if (sort === "-rating") sortOptions["hotelId.rating"] = -1;
+    else if (sort === "discountPercent") sortOptions.discountPercent = 1;
+    else if (sort === "-discountPercent") sortOptions.discountPercent = -1;
 
     // Fetch available rooms
     const rooms = await RoomService.findAvailableRooms(
@@ -690,13 +1115,13 @@ if (amenities) {
         skip: (Number(page) - 1) * Number(limit),
         limit: Number(limit),
         minPrice,
-        maxPrice
+        maxPrice,
       }
     );
 
     // Group by hotel
     const hotelMap = new Map();
-    rooms.forEach(room => {
+    rooms.forEach((room) => {
       const hotelId = room.hotelId._id.toString();
       if (!hotelMap.has(hotelId)) {
         hotelMap.set(hotelId, {
@@ -711,7 +1136,7 @@ if (amenities) {
           lowestPrice: room.hotelId.lowestPrice,
           lowestDiscountedPrice: room.hotelId.lowestDiscountedPrice,
           highestDiscountPercent: room.hotelId.highestDiscountPercent,
-          availableRoomCount: 0
+          availableRoomCount: 0,
         });
       }
       hotelMap.get(hotelId).availableRoomCount += 1;
@@ -726,23 +1151,99 @@ if (amenities) {
       total,
       pagination: {
         currentPage: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(total / Number(limit)),
       },
-      data: hotelsWithAvailableRooms
+      data: hotelsWithAvailableRooms,
     });
   } catch (error) {
-    console.error('Search hotels error:', { message: error.message, stack: error.stack });
+    console.error("Search hotels error:", {
+      message: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       success: false,
-      message: 'Lỗi server',
-      error: error.message
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
 
-// @desc    Lấy danh sách phòng còn trống trong một khách sạn
-// @route   GET /api/hotels/:hotelId/rooms/available
-// @access  Public
+/**
+ * @swagger
+ * /api/hotels/{hotelId}/rooms/available:
+ *   get:
+ *     summary: Lấy danh sách phòng còn trống trong một khách sạn
+ *     tags: [Hotel]
+ *     parameters:
+ *       - in: path
+ *         name: hotelId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID khách sạn
+ *       - in: query
+ *         name: checkIn
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày nhận phòng
+ *       - in: query
+ *         name: checkOut
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Ngày trả phòng
+ *       - in: query
+ *         name: capacity
+ *         schema:
+ *           type: integer
+ *         description: Số người
+ *       - in: query
+ *         name: minPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối thiểu
+ *       - in: query
+ *         name: maxPrice
+ *         schema:
+ *           type: number
+ *         description: Giá tối đa
+ *       - in: query
+ *         name: roomType
+ *         schema:
+ *           type: string
+ *         description: Loại phòng
+ *       - in: query
+ *         name: amenities
+ *         schema:
+ *           type: string
+ *         description: Danh sách tiện ích (cách nhau bằng dấu phẩy)
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sắp xếp
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách phòng còn trống thành công
+ *       400:
+ *         description: Thiếu hoặc sai tham số
+ *       404:
+ *         description: Không tìm thấy khách sạn hoặc phòng
+ *       500:
+ *         description: Lỗi server
+ */
+
 exports.getAvailableRoomsByHotel = async (req, res) => {
   try {
     const { hotelId } = req.params;
@@ -754,18 +1255,24 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
       maxPrice,
       roomType,
       amenities,
-      sort = 'price',
+      sort = "price",
       page = 1,
-      limit = 10
+      limit = 10,
     } = req.query;
 
-    console.log('getAvailableRoomsByHotel - Query params:', req.query, 'Hotel ID:', hotelId);
+    console.log(
+      "getAvailableRoomsByHotel - Query params:",
+      req.query,
+      "Hotel ID:",
+      hotelId
+    );
 
     // Validate input
     if (!checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người'
+        message:
+          "Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người",
       });
     }
 
@@ -774,53 +1281,62 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
     if (isNaN(checkInDate) || isNaN(checkOutDate)) {
       return res.status(400).json({
         success: false,
-        message: 'Định dạng ngày không hợp lệ'
+        message: "Định dạng ngày không hợp lệ",
       });
     }
     if (checkInDate >= checkOutDate) {
       return res.status(400).json({
         success: false,
-        message: 'Ngày nhận phòng phải trước ngày trả phòng'
+        message: "Ngày nhận phòng phải trước ngày trả phòng",
       });
     }
 
     // Validate sort
-    const validSortValues = ['price', '-price', 'discountPercent', '-discountPercent'];
+    const validSortValues = [
+      "price",
+      "-price",
+      "discountPercent",
+      "-discountPercent",
+    ];
     if (sort && !validSortValues.includes(sort)) {
       return res.status(400).json({
         success: false,
-        message: `Giá trị sort không hợp lệ. Chấp nhận: ${validSortValues.join(', ')}`
+        message: `Giá trị sort không hợp lệ. Chấp nhận: ${validSortValues.join(
+          ", "
+        )}`,
       });
     }
 
     // Validate hotel
     const hotel = await Hotel.findById(hotelId);
-    if (!hotel || hotel.status !== 'active') {
+    if (!hotel || hotel.status !== "active") {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy khách sạn hoặc khách sạn không hoạt động'
+        message: "Không tìm thấy khách sạn hoặc khách sạn không hoạt động",
       });
     }
 
     // Build room query
     const roomQuery = {
       hotelId: new mongoose.Types.ObjectId(hotelId),
-      capacity: { $gte: Number(capacity) }
+      capacity: { $gte: Number(capacity) },
     };
     if (roomType) {
       roomQuery.roomType = roomType;
     }
     if (amenities) {
-      const amenitiesArray = Array.isArray(amenities) ? amenities : amenities.split(',');
+      const amenitiesArray = Array.isArray(amenities)
+        ? amenities
+        : amenities.split(",");
       roomQuery.amenities = { $all: amenitiesArray };
     }
 
     // Sort options
     const sortOptions = {};
-    if (sort === 'price') sortOptions.discountedPrice = 1;
-    else if (sort === '-price') sortOptions.discountedPrice = -1;
-    else if (sort === 'discountPercent') sortOptions.discountPercent = 1;
-    else if (sort === '-discountPercent') sortOptions.discountPercent = -1;
+    if (sort === "price") sortOptions.discountedPrice = 1;
+    else if (sort === "-price") sortOptions.discountedPrice = -1;
+    else if (sort === "discountPercent") sortOptions.discountPercent = 1;
+    else if (sort === "-discountPercent") sortOptions.discountPercent = -1;
 
     // Fetch available rooms
     const rooms = await RoomService.findAvailableRooms(
@@ -832,14 +1348,26 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         skip: (Number(page) - 1) * Number(limit),
         limit: Number(limit),
         minPrice,
-        maxPrice
+        maxPrice,
       }
     );
 
     // Count total rooms
-    const total = (await RoomService.findAvailableRooms(roomQuery, checkInDate, checkOutDate, { minPrice, maxPrice })).length;
+    const total = (
+      await RoomService.findAvailableRooms(
+        roomQuery,
+        checkInDate,
+        checkOutDate,
+        { minPrice, maxPrice }
+      )
+    ).length;
 
-    console.log('Available rooms for hotel', hotelId, ':', rooms.map(room => room._id.toString()));
+    console.log(
+      "Available rooms for hotel",
+      hotelId,
+      ":",
+      rooms.map((room) => room._id.toString())
+    );
 
     res.status(200).json({
       success: true,
@@ -847,9 +1375,9 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
       total,
       pagination: {
         currentPage: Number(page),
-        totalPages: Math.ceil(total / Number(limit))
+        totalPages: Math.ceil(total / Number(limit)),
       },
-      data: rooms.map(room => ({
+      data: rooms.map((room) => ({
         _id: room._id,
         name: room.name,
         description: room.description,
@@ -869,15 +1397,18 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         status: room.status,
         hasDiscount: room.hasDiscount,
         createdAt: room.createdAt,
-        updatedAt: room.updatedAt
-      }))
+        updatedAt: room.updatedAt,
+      })),
     });
   } catch (error) {
-    console.error('Get available rooms error:', { message: error.message, stack: error.stack });
+    console.error("Get available rooms error:", {
+      message: error.message,
+      stack: error.stack,
+    });
     res.status(500).json({
       success: false,
-      message: 'Lỗi server',
-      error: error.message
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };

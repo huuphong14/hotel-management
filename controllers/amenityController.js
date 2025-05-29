@@ -1,14 +1,42 @@
-const Amenity = require('../models/Amenity');
+const Amenity = require("../models/Amenity");
 
-// @desc    Tạo tiện ích mới
-// @route   POST /api/amenities
-// @access  Private/Admin
+/**
+ * @swagger
+ * /api/amenities:
+ *   post:
+ *     summary: Tạo tiện ích mới
+ *     tags: [Amenity]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Tên tiện ích
+ *               icon:
+ *                 type: string
+ *                 description: Icon tiện ích (nếu có)
+ *     responses:
+ *       201:
+ *         description: Tạo tiện ích thành công
+ *       403:
+ *         description: Chỉ admin mới có quyền
+ *       500:
+ *         description: Lỗi server
+ */
 exports.createAmenity = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ admin mới có quyền thực hiện hành động này'
+        message: "Chỉ admin mới có quyền thực hiện hành động này",
       });
     }
 
@@ -16,20 +44,29 @@ exports.createAmenity = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: amenity
+      data: amenity,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy danh sách tiện ích
-// @route   GET /api/amenities
-// @access  Public
+/**
+ * @swagger
+ * /api/amenities:
+ *   get:
+ *     summary: Lấy danh sách tiện ích
+ *     tags: [Amenity]
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách tiện ích thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getAmenities = async (req, res) => {
   try {
     const amenities = await Amenity.find();
@@ -37,20 +74,38 @@ exports.getAmenities = async (req, res) => {
     res.status(200).json({
       success: true,
       count: amenities.length,
-      data: amenities
+      data: amenities,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Lấy thông tin một tiện ích
-// @route   GET /api/amenities/:id
-// @access  Public
+/**
+ * @swagger
+ * /api/amenities/{id}:
+ *   get:
+ *     summary: Lấy thông tin một tiện ích
+ *     tags: [Amenity]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID tiện ích
+ *     responses:
+ *       200:
+ *         description: Lấy thông tin tiện ích thành công
+ *       404:
+ *         description: Không tìm thấy tiện ích
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getAmenity = async (req, res) => {
   try {
     const amenity = await Amenity.findById(req.params.id);
@@ -58,69 +113,126 @@ exports.getAmenity = async (req, res) => {
     if (!amenity) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy tiện ích'
+        message: "Không tìm thấy tiện ích",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: amenity
+      data: amenity,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Cập nhật tiện ích
-// @route   PUT /api/amenities/:id
-// @access  Private/Admin
+/**
+ * @swagger
+ * /api/amenities/{id}:
+ *   put:
+ *     summary: Cập nhật tiện ích
+ *     tags: [Amenity]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID tiện ích
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Tên tiện ích
+ *               icon:
+ *                 type: string
+ *                 description: Icon tiện ích (nếu có)
+ *     responses:
+ *       200:
+ *         description: Cập nhật tiện ích thành công
+ *       403:
+ *         description: Chỉ admin mới có quyền
+ *       404:
+ *         description: Không tìm thấy tiện ích
+ *       500:
+ *         description: Lỗi server
+ */
 exports.updateAmenity = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ admin mới có quyền thực hiện hành động này'
+        message: "Chỉ admin mới có quyền thực hiện hành động này",
       });
     }
 
     const amenity = await Amenity.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
-      runValidators: true
+      runValidators: true,
     });
 
     if (!amenity) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy tiện ích'
+        message: "Không tìm thấy tiện ích",
       });
     }
 
     res.status(200).json({
       success: true,
-      data: amenity
+      data: amenity,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
 
-// @desc    Xóa tiện ích
-// @route   DELETE /api/amenities/:id
-// @access  Private/Admin
+/**
+ * @swagger
+ * /api/amenities/{id}:
+ *   delete:
+ *     summary: Xóa tiện ích
+ *     tags: [Amenity]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID tiện ích
+ *     responses:
+ *       200:
+ *         description: Xóa tiện ích thành công
+ *       403:
+ *         description: Chỉ admin mới có quyền
+ *       404:
+ *         description: Không tìm thấy tiện ích
+ *       500:
+ *         description: Lỗi server
+ */
 exports.deleteAmenity = async (req, res) => {
   try {
-    if (req.user.role !== 'admin') {
+    if (req.user.role !== "admin") {
       return res.status(403).json({
         success: false,
-        message: 'Chỉ admin mới có quyền thực hiện hành động này'
+        message: "Chỉ admin mới có quyền thực hiện hành động này",
       });
     }
 
@@ -129,7 +241,7 @@ exports.deleteAmenity = async (req, res) => {
     if (!amenity) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy tiện ích'
+        message: "Không tìm thấy tiện ích",
       });
     }
 
@@ -137,13 +249,13 @@ exports.deleteAmenity = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Tiện ích đã được xóa'
+      message: "Tiện ích đã được xóa",
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi server'
+      message: "Lỗi server",
     });
   }
 };
