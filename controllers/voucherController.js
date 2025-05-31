@@ -1,10 +1,65 @@
-const Voucher = require('../models/Voucher');
-const User = require('../models/User');
-const NotificationService = require('../services/notificationService');
+const Voucher = require("../models/Voucher");
+const User = require("../models/User");
+const NotificationService = require("../services/notificationService");
 
-// @desc    Tạo voucher mới
-// @route   POST /api/vouchers
-// @access  Admin
+/**
+ * @swagger
+ * /api/vouchers:
+ *   post:
+ *     summary: Tạo voucher mới
+ *     tags: [Voucher]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - code
+ *               - discount
+ *               - expiryDate
+ *               - discountType
+ *             properties:
+ *               code:
+ *                 type: string
+ *                 example: SUMMER2024
+ *               discount:
+ *                 type: number
+ *                 example: 10
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *                 example: 2024-06-01
+ *               expiryDate:
+ *                 type: string
+ *                 format: date
+ *                 example: 2024-07-01
+ *               status:
+ *                 type: string
+ *                 example: active
+ *               usageLimit:
+ *                 type: number
+ *                 example: 100
+ *               minOrderValue:
+ *                 type: number
+ *                 example: 500000
+ *               discountType:
+ *                 type: string
+ *                 enum: [percentage, fixed]
+ *                 example: percentage
+ *               maxDiscount:
+ *                 type: number
+ *                 example: 200000
+ *     responses:
+ *       201:
+ *         description: Tạo voucher thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ hoặc mã đã tồn tại
+ *       500:
+ *         description: Lỗi server
+ */
 exports.createVoucher = async (req, res) => {
   try {
     const {
@@ -16,7 +71,7 @@ exports.createVoucher = async (req, res) => {
       usageLimit,
       minOrderValue,
       discountType,
-      maxDiscount
+      maxDiscount,
     } = req.body;
 
     // Kiểm tra mã voucher đã tồn tại
@@ -24,8 +79,8 @@ exports.createVoucher = async (req, res) => {
     if (existingVoucher) {
       return res.status(400).json({
         success: false,
-        errorCode: 'VOUCHER_CODE_EXISTS',
-        message: 'Mã voucher đã tồn tại'
+        errorCode: "VOUCHER_CODE_EXISTS",
+        message: "Mã voucher đã tồn tại",
       });
     }
 
@@ -33,8 +88,9 @@ exports.createVoucher = async (req, res) => {
     if (!code || !discount || !expiryDate || !discountType) {
       return res.status(400).json({
         success: false,
-        errorCode: 'MISSING_REQUIRED_FIELDS',
-        message: 'Thiếu các trường bắt buộc (code, discount, expiryDate, discountType)'
+        errorCode: "MISSING_REQUIRED_FIELDS",
+        message:
+          "Thiếu các trường bắt buộc (code, discount, expiryDate, discountType)",
       });
     }
 
@@ -42,15 +98,15 @@ exports.createVoucher = async (req, res) => {
     if (startDate && isNaN(new Date(startDate).getTime())) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_START_DATE',
-        message: 'Ngày bắt đầu không hợp lệ'
+        errorCode: "INVALID_START_DATE",
+        message: "Ngày bắt đầu không hợp lệ",
       });
     }
     if (isNaN(new Date(expiryDate).getTime())) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_EXPIRY_DATE',
-        message: 'Ngày hết hạn không hợp lệ'
+        errorCode: "INVALID_EXPIRY_DATE",
+        message: "Ngày hết hạn không hợp lệ",
       });
     }
 
@@ -66,8 +122,8 @@ exports.createVoucher = async (req, res) => {
     if (expiry < today) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_EXPIRY_DATE',
-        message: 'Ngày hết hạn không thể là ngày trong quá khứ'
+        errorCode: "INVALID_EXPIRY_DATE",
+        message: "Ngày hết hạn không thể là ngày trong quá khứ",
       });
     }
 
@@ -75,17 +131,17 @@ exports.createVoucher = async (req, res) => {
     if (start > expiry) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_DATE_RANGE',
-        message: 'Ngày bắt đầu không thể sau ngày hết hạn'
+        errorCode: "INVALID_DATE_RANGE",
+        message: "Ngày bắt đầu không thể sau ngày hết hạn",
       });
     }
 
     // Kiểm tra giá trị discount
-    if (discountType === 'percentage' && discount > 100) {
+    if (discountType === "percentage" && discount > 100) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_DISCOUNT',
-        message: 'Giảm giá theo phần trăm không thể vượt quá 100%'
+        errorCode: "INVALID_DISCOUNT",
+        message: "Giảm giá theo phần trăm không thể vượt quá 100%",
       });
     }
 
@@ -99,11 +155,11 @@ exports.createVoucher = async (req, res) => {
       usageCount: 0,
       minOrderValue: minOrderValue || 0,
       discountType,
-      status: status || 'active'
+      status: status || "active",
     };
 
     // Chỉ thêm maxDiscount nếu discountType là percentage
-    if (discountType === 'percentage' && maxDiscount !== undefined) {
+    if (discountType === "percentage" && maxDiscount !== undefined) {
       voucherData.maxDiscount = maxDiscount;
     } else {
       voucherData.maxDiscount = null;
@@ -112,30 +168,52 @@ exports.createVoucher = async (req, res) => {
     const voucher = await Voucher.create(voucherData);
 
     // Lấy danh sách user để gửi thông báo
-    const users = await User.find({ role: 'user' });
-    const userIds = users.map(user => user._id);
+    const users = await User.find({ role: "user" });
+    const userIds = users.map((user) => user._id);
 
     // Tạo thông báo
     await NotificationService.createVoucherNotification(voucher, userIds);
 
     res.status(201).json({
       success: true,
-      data: voucher
+      data: voucher,
     });
   } catch (error) {
-    console.error('Error creating voucher:', error);
+    console.error("Error creating voucher:", error);
     res.status(500).json({
       success: false,
-      errorCode: 'SERVER_ERROR',
-      message: 'Lỗi server',
-      error: error.message
+      errorCode: "SERVER_ERROR",
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
 
-// @desc    Lấy danh sách voucher
-// @route   GET /api/vouchers
-// @access  Admin
+/**
+ * @swagger
+ * /api/vouchers:
+ *   get:
+ *     summary: Lấy danh sách voucher
+ *     tags: [Voucher]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang hiện tại
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách voucher thành công
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getVouchers = async (req, res) => {
   try {
     const { page = 1, limit = 20 } = req.query;
@@ -156,24 +234,72 @@ exports.getVouchers = async (req, res) => {
         total,
         currentPage: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(total / limitNum)
+        totalPages: Math.ceil(total / limitNum),
       },
-      data: vouchers
+      data: vouchers,
     });
   } catch (error) {
-    console.error('Error getting vouchers:', error);
+    console.error("Error getting vouchers:", error);
     res.status(500).json({
       success: false,
-      errorCode: 'SERVER_ERROR',
-      message: 'Lỗi server',
-      error: error.message
+      errorCode: "SERVER_ERROR",
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
 
-// @desc    Cập nhật voucher
-// @route   PUT /api/vouchers/:id
-// @access  Admin
+/**
+ * @swagger
+ * /api/vouchers/{id}:
+ *   put:
+ *     summary: Cập nhật voucher
+ *     tags: [Voucher]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID của voucher
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               discount:
+ *                 type: number
+ *               startDate:
+ *                 type: string
+ *                 format: date
+ *               expiryDate:
+ *                 type: string
+ *                 format: date
+ *               status:
+ *                 type: string
+ *               usageLimit:
+ *                 type: number
+ *               minOrderValue:
+ *                 type: number
+ *               discountType:
+ *                 type: string
+ *                 enum: [percentage, fixed]
+ *               maxDiscount:
+ *                 type: number
+ *     responses:
+ *       200:
+ *         description: Cập nhật voucher thành công
+ *       404:
+ *         description: Không tìm thấy voucher
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       500:
+ *         description: Lỗi server
+ */
 exports.updateVoucher = async (req, res) => {
   try {
     const {
@@ -184,7 +310,7 @@ exports.updateVoucher = async (req, res) => {
       usageLimit,
       minOrderValue,
       discountType,
-      maxDiscount
+      maxDiscount,
     } = req.body;
 
     const voucher = await Voucher.findById(req.params.id);
@@ -192,8 +318,8 @@ exports.updateVoucher = async (req, res) => {
     if (!voucher) {
       return res.status(404).json({
         success: false,
-        errorCode: 'VOUCHER_NOT_FOUND',
-        message: 'Không tìm thấy voucher'
+        errorCode: "VOUCHER_NOT_FOUND",
+        message: "Không tìm thấy voucher",
       });
     }
 
@@ -201,15 +327,15 @@ exports.updateVoucher = async (req, res) => {
     if (startDate && isNaN(new Date(startDate).getTime())) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_START_DATE',
-        message: 'Ngày bắt đầu không hợp lệ'
+        errorCode: "INVALID_START_DATE",
+        message: "Ngày bắt đầu không hợp lệ",
       });
     }
     if (expiryDate && isNaN(new Date(expiryDate).getTime())) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_EXPIRY_DATE',
-        message: 'Ngày hết hạn không hợp lệ'
+        errorCode: "INVALID_EXPIRY_DATE",
+        message: "Ngày hết hạn không hợp lệ",
       });
     }
 
@@ -218,23 +344,25 @@ exports.updateVoucher = async (req, res) => {
     today.setUTCHours(0, 0, 0, 0);
     const newStartDate = startDate ? new Date(startDate) : voucher.startDate;
     newStartDate.setUTCHours(0, 0, 0, 0);
-    const newExpiryDate = expiryDate ? new Date(expiryDate) : voucher.expiryDate;
+    const newExpiryDate = expiryDate
+      ? new Date(expiryDate)
+      : voucher.expiryDate;
     newExpiryDate.setUTCHours(0, 0, 0, 0);
 
     // Kiểm tra ngày
     if (newExpiryDate < today) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_EXPIRY_DATE',
-        message: 'Ngày hết hạn không thể là ngày trong quá khứ'
+        errorCode: "INVALID_EXPIRY_DATE",
+        message: "Ngày hết hạn không thể là ngày trong quá khứ",
       });
     }
 
     if (newStartDate > newExpiryDate) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_DATE_RANGE',
-        message: 'Ngày bắt đầu không thể sau ngày hết hạn'
+        errorCode: "INVALID_DATE_RANGE",
+        message: "Ngày bắt đầu không thể sau ngày hết hạn",
       });
     }
 
@@ -242,11 +370,11 @@ exports.updateVoucher = async (req, res) => {
     const newDiscountType = discountType || voucher.discountType;
     const newDiscount = discount !== undefined ? discount : voucher.discount;
 
-    if (newDiscountType === 'percentage' && newDiscount > 100) {
+    if (newDiscountType === "percentage" && newDiscount > 100) {
       return res.status(400).json({
         success: false,
-        errorCode: 'INVALID_DISCOUNT',
-        message: 'Giảm giá theo phần trăm không thể vượt quá 100%'
+        errorCode: "INVALID_DISCOUNT",
+        message: "Giảm giá theo phần trăm không thể vượt quá 100%",
       });
     }
 
@@ -260,8 +388,9 @@ exports.updateVoucher = async (req, res) => {
     if (discountType) voucher.discountType = discountType;
 
     // Xử lý maxDiscount dựa trên discountType
-    if (newDiscountType === 'percentage') {
-      voucher.maxDiscount = maxDiscount !== undefined ? maxDiscount : voucher.maxDiscount;
+    if (newDiscountType === "percentage") {
+      voucher.maxDiscount =
+        maxDiscount !== undefined ? maxDiscount : voucher.maxDiscount;
     } else {
       voucher.maxDiscount = null;
     }
@@ -270,22 +399,51 @@ exports.updateVoucher = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: voucher
+      data: voucher,
     });
   } catch (error) {
-    console.error('Error updating voucher:', error);
+    console.error("Error updating voucher:", error);
     res.status(500).json({
       success: false,
-      errorCode: 'SERVER_ERROR',
-      message: 'Lỗi server',
-      error: error.message
+      errorCode: "SERVER_ERROR",
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
 
-// @desc    Lấy danh sách voucher có thể sử dụng
-// @route   GET /api/vouchers/available
-// @access  Private
+/**
+ * @swagger
+ * /api/vouchers/available:
+ *   get:
+ *     summary: Lấy danh sách voucher có thể sử dụng
+ *     tags: [Voucher]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: totalAmount
+ *         schema:
+ *           type: number
+ *         description: Giá trị đơn hàng để lọc voucher phù hợp
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Trang hiện tại
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Số lượng mỗi trang
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách voucher có thể sử dụng thành công
+ *       400:
+ *         description: Dữ liệu không hợp lệ
+ *       500:
+ *         description: Lỗi server
+ */
 exports.getAvailableVouchers = async (req, res) => {
   try {
     const { totalAmount, page = 1, limit = 10 } = req.query;
@@ -296,8 +454,8 @@ exports.getAvailableVouchers = async (req, res) => {
       if (isNaN(parsedTotalAmount) || parsedTotalAmount < 0) {
         return res.status(400).json({
           success: false,
-          errorCode: 'INVALID_TOTAL_AMOUNT',
-          message: 'Giá trị đơn hàng không hợp lệ'
+          errorCode: "INVALID_TOTAL_AMOUNT",
+          message: "Giá trị đơn hàng không hợp lệ",
         });
       }
     }
@@ -305,18 +463,34 @@ exports.getAvailableVouchers = async (req, res) => {
     const now = new Date();
 
     // Lấy thời điểm đầu và cuối ngày hiện tại (giờ địa phương hoặc UTC+7)
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      0,
+      0,
+      0,
+      0
+    );
+    const endOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
 
     // Query: status active, startDate <= endOfToday, expiryDate >= startOfToday
     const query = {
-      status: 'active',
+      status: "active",
       startDate: { $lte: endOfToday },
       expiryDate: { $gte: startOfToday },
       $or: [
         { usageLimit: null },
-        { $expr: { $lt: ['$usageCount', '$usageLimit'] } }
-      ]
+        { $expr: { $lt: ["$usageCount", "$usageLimit"] } },
+      ],
     };
 
     if (parsedTotalAmount !== null) {
@@ -328,14 +502,18 @@ exports.getAvailableVouchers = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const vouchers = await Voucher.find(query)
-      .select('code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount')
+      .select(
+        "code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount"
+      )
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
 
-    const availableVouchers = vouchers.map(voucher => ({
+    const availableVouchers = vouchers.map((voucher) => ({
       ...voucher.toObject(),
-      remainingUses: voucher.usageLimit ? voucher.usageLimit - voucher.usageCount : null
+      remainingUses: voucher.usageLimit
+        ? voucher.usageLimit - voucher.usageCount
+        : null,
     }));
 
     res.status(200).json({
@@ -344,17 +522,17 @@ exports.getAvailableVouchers = async (req, res) => {
         total: availableVouchers.length,
         currentPage: pageNum,
         limit: limitNum,
-        totalPages: Math.ceil(availableVouchers.length / limitNum)
+        totalPages: Math.ceil(availableVouchers.length / limitNum),
       },
-      data: availableVouchers
+      data: availableVouchers,
     });
   } catch (error) {
-    console.error('Error getting available vouchers:', error);
+    console.error("Error getting available vouchers:", error);
     res.status(500).json({
       success: false,
-      errorCode: 'SERVER_ERROR',
-      message: 'Lỗi server',
-      error: error.message
+      errorCode: "SERVER_ERROR",
+      message: "Lỗi server",
+      error: error.message,
     });
   }
 };
