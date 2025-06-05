@@ -1,6 +1,7 @@
 const socketIO = require('socket.io');
 const Chat = require('../models/Chat');
 const Notification = require('../models/Notification');
+const dialogflowController = require('../controllers/dialogflowController');
 
 let io;
 const userSockets = new Map(); // Lưu trữ socket của từng user
@@ -15,7 +16,7 @@ module.exports = {
         socket.userId = userId;
         userSockets.set(userId, socket.id);
         socket.join(userId);
-        
+
         // Thông báo user online
         socket.broadcast.emit('userOnline', { userId });
       });
@@ -37,7 +38,7 @@ module.exports = {
           // Gửi tin nhắn đến người nhận
           if (userSockets.has(receiverId)) {
             io.to(receiverId).emit('newMessage', chat);
-            
+
             // Tạo và gửi thông báo tin nhắn mới
             const notification = await Notification.create({
               userId: receiverId,
@@ -47,7 +48,7 @@ module.exports = {
               relatedId: chat._id,
               refModel: 'Chat'
             });
-            
+
             io.to(receiverId).emit('notification', notification);
           }
 
@@ -57,11 +58,32 @@ module.exports = {
         }
       });
 
+      socket.on('sendBotMessage', async (data) => {
+        try {
+          const { message, sessionId } = data;
+          const userId = socket.userId;
+
+          // Gửi tin nhắn đến Dialogflow
+          const response = await dialogflowController.sendTextMessage(message, sessionId);
+
+          // Gửi phản hồi từ Dialogflow về client 
+          socket.emit('newBotMessage', {
+            userMessage: message,
+            botResponse: response.responseText,
+            dialogflowResponse: response,
+            sessionId,
+          });
+        } catch (error) {
+          console.error('Bot message error:', error.message);
+          socket.emit('botMessageError', { error: 'Lỗi xử lý với chatbot' });
+        }
+      });
+
       // NOTIFICATION HANDLERS
       socket.on('sendNotification', async (data) => {
         try {
           const { userIds, title, message, type, relatedId, refModel } = data;
-          
+
           // Tạo và gửi thông báo cho nhiều user
           const notifications = await Promise.all(
             userIds.map(async (userId) => {
@@ -92,7 +114,7 @@ module.exports = {
       socket.on('markNotificationAsRead', async (data) => {
         try {
           const { notificationId } = data;
-          
+
           const notification = await Notification.findByIdAndUpdate(
             notificationId,
             { status: 'read' },
@@ -123,9 +145,9 @@ module.exports = {
       socket.on('markAsRead', async (data) => {
         try {
           const { chatId, senderId } = data;
-          
+
           await Chat.findByIdAndUpdate(chatId, { status: 'read' });
-          
+
           if (userSockets.has(senderId)) {
             io.to(senderId).emit('messageRead', { chatId });
           }
