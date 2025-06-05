@@ -9,11 +9,12 @@ const session = require("express-session");
 const http = require("http");
 const socketIO = require("./utils/socket");
 const { scheduleUpdateLowestPrices } = require("./utils/cronJobs");
-const cancelExpiredBookings = require("./jobs/cancelExpiredBookings"); // Thêm cron job mới
-const promClient = require("prom-client"); // Thêm Prometheus client
-const cron = require("node-cron"); // Thêm node-cron
+const cancelExpiredBookings = require("./jobs/cancelExpiredBookings");
+const promClient = require("prom-client");
+const cron = require("node-cron");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./config/swagger");
+const dialogflowController = require("./controllers/dialogflowController");
 
 // Load các routes
 const authRoutes = require("./routes/authRoutes");
@@ -23,7 +24,8 @@ const roomRoutes = require("./routes/roomRoutes");
 const postRoutes = require("./routes/postRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
-const chatRoutes = require("./routes/chatRoutes");
+const chatRoutes = require("./routes/chatRoutes"); // Routes cho Dialogflow CX
+const chatbotRoutes = require("./routes/chatbotRoutes"); // Routes mới cho chatbot
 const voucherRoutes = require("./routes/voucherRoutes");
 const amenityRoute = require("./routes/amenityroute");
 const favoriteRoutes = require("./routes/favoriteRoutes");
@@ -42,12 +44,12 @@ const server = http.createServer(app);
 connectDB();
 
 // Cấu hình Prometheus
-promClient.collectDefaultMetrics(); // Thu thập các metric mặc định (CPU, memory, v.v.)
+promClient.collectDefaultMetrics();
 const httpRequestDurationMicroseconds = new promClient.Histogram({
   name: "http_request_duration_ms",
   help: "Duration of HTTP requests in ms",
   labelNames: ["method", "route", "code"],
-  buckets: [50, 100, 200, 300, 500, 1000, 2000], // Các mức thời gian phản hồi
+  buckets: [50, 100, 200, 300, 500, 1000, 2000],
 });
 
 // Middleware để đo thời gian xử lý request
@@ -121,7 +123,8 @@ app.use("/api/rooms", roomRoutes);
 app.use("/api/posts", postRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/reviews", reviewRoutes);
-app.use("/api/chats", chatRoutes);
+app.use("/api/chats", chatRoutes); // Routes cho Dialogflow CX
+app.use("/api/chatbot", chatbotRoutes); // Routes mới cho chatbot
 app.use("/api/vouchers", voucherRoutes);
 app.use("/api/amenities", amenityRoute);
 app.use("/api/favorites", favoriteRoutes);
@@ -165,9 +168,16 @@ app.use((err, req, res, next) => {
 
 // Khởi động server
 const PORT = config.port;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`API docs: http://localhost:${PORT}/api-docs`);
+  try {
+    const isDialogflowHealthy = await dialogflowController.testConnection();
+    console.log(`Dialogflow connection: ${isDialogflowHealthy ? 'healthy' : 'unhealthy'}`);
+  } catch (error) {
+    console.error('Dialogflow connection test failed:', error.message);
+    console.log('Dialogflow connection: unhealthy');
+  }
 });
 
 // Xử lý lỗi không bắt được
