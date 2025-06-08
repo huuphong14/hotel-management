@@ -161,8 +161,12 @@ exports.createBooking = async (req, res) => {
 
     // Get room details
     const room = await Room.findById(roomId)
-      .populate("hotelId")
+      .populate({
+        path: 'hotelId',
+        select: 'name address city'
+      })
       .session(session);
+    
     if (!room) {
       await session.abortTransaction();
       session.endSession();
@@ -171,6 +175,19 @@ exports.createBooking = async (req, res) => {
         message: "Không tìm thấy phòng",
       });
     }
+
+    // Lấy thông tin khách sạn từ room đã populate
+    const hotelInfo = room.hotelId || {};
+    const hotelName = hotelInfo.name || 'Chưa có tên khách sạn';
+    const hotelAddress = hotelInfo.address || 'Chưa cập nhật địa chỉ';
+    const roomTypeName = room.roomType || 'Chưa xác định loại phòng';
+
+    console.log("Thông tin khách sạn từ room:", {
+      hotelName,
+      hotelAddress,
+      roomType: roomTypeName,
+      roomId: room._id
+    });
 
     // Check room availability
     const isAvailable = await checkRoomAvailability(
@@ -245,34 +262,21 @@ exports.createBooking = async (req, res) => {
       await voucherValidation.voucher.save({ session });
     }
 
-    // Populate booking details
+    // Populate booking details for response
     await booking.populate([
       { path: "voucher", select: "code discount discountType" },
       {
         path: "room",
-        select: "name type price hotelId",
+        select: "name roomType price hotelId",
         populate: { path: "hotelId", select: "name address city" },
       },
       { path: "user", select: "name email" },
     ]);
 
-    console.log("Booking sau populate:", {
-      roomId: booking.room?._id,
-      hotelName: booking.room?.hotelId?.name,
-      hotelAddress: booking.room?.hotelId?.address,
-    });
-
     // Create notification
     await NotificationService.createBookingNotification(booking);
 
-    // Send confirmation email
-    const hotelName = booking.room?.hotelId?.name || "Khách sạn";
-    const hotelAddress = booking.room?.hotelId?.address || "Không xác định";
-    console.log("Booking trước tạo message:", {
-      hotelName,
-      hotelAddress,
-    });
-
+    // Format payment method for email
     const formattedPaymentMethod =
       paymentMethod === "zalopay"
         ? "ZaloPay"
@@ -282,13 +286,15 @@ exports.createBooking = async (req, res) => {
         ? "Thẻ tín dụng"
         : "PayPal";
 
+    // Create email message with correct hotel information
     const message = `
       <h1>Xác nhận đặt phòng</h1>
       <p>Thông tin đặt phòng:</p>
       <ul>
         <li>Khách sạn: ${hotelName}</li>
         <li>Địa chỉ: ${hotelAddress}</li>
-        <li>Loại phòng: ${booking.room?.type || "Không xác định"}</li>
+        <li>Loại phòng: ${roomTypeName}</li>
+        <li>Tên phòng: ${room.name}</li>
         <li>Ngày check-in: ${new Date(booking.checkIn).toLocaleDateString(
           "vi-VN"
         )}</li>
@@ -353,13 +359,20 @@ exports.createBooking = async (req, res) => {
       }
       
       <p>Trạng thái: Chờ xác nhận</p>
+      <p><strong>Mã đặt phòng:</strong> ${booking._id}</p>
     `;
 
     try {
       console.log("Sending email to:", contactInfo.email);
+      console.log("Email content preview:", {
+        hotelName,
+        hotelAddress,
+        roomType: roomTypeName
+      });
+      
       await sendEmail({
         email: contactInfo.email,
-        subject: "Xác nhận đặt phòng",
+        subject: `Xác nhận đặt phòng tại ${hotelName}`,
         message,
       });
       console.log("Email sent successfully");
@@ -399,6 +412,30 @@ exports.createBooking = async (req, res) => {
   }
 };
 
+function validateHotelData(room) {
+  const issues = [];
+  
+  if (!room.hotelId) {
+    issues.push("Room không có thông tin hotelId");
+  } else {
+    if (!room.hotelId.name) {
+      issues.push("Hotel thiếu tên");
+    }
+    if (!room.hotelId.address) {
+      issues.push("Hotel thiếu địa chỉ");
+    }
+  }
+  
+  if (!room.roomType) {
+    issues.push("Room thiếu roomType");
+  }
+  
+  if (issues.length > 0) {
+    console.warn("Dữ liệu thiếu:", issues.join(", "));
+  }
+  
+  return issues.length === 0;
+}
 /**
  * @swagger
  * /api/bookings/retry-payment:

@@ -11,6 +11,11 @@ const passport = require("passport");
 const asyncHandler = require("../middlewares/asyncHandler");
 const cloudinaryService = require("../config/cloudinaryService");
 
+// Hàm tạo mã OTP 6 số
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
 /**
  * @swagger
  * /api/auth/register:

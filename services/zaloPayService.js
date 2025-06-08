@@ -1,6 +1,5 @@
 const axios = require('axios');
 const crypto = require('crypto');
-const CryptoJS = require('crypto-js');
 const moment = require('moment');
 const Payment = require('../models/Payment');
 const Booking = require('../models/Booking');
@@ -62,7 +61,6 @@ class ZaloPayService {
     const transactionId = this.generateTransactionId();
     const amount = Math.round(booking.finalPrice);
 
-    // Làm sạch các giao dịch cũ
     await Payment.updateMany(
       { bookingId: booking._id, status: { $in: ['pending', 'failed'] } },
       { status: 'cancelled' }
@@ -217,7 +215,9 @@ class ZaloPayService {
 
     console.log(`Chuỗi dữ liệu chữ ký: ${dataStr}`);
 
-    refundData.mac = CryptoJS.HmacSHA256(dataStr, this.config.key1).toString();
+    refundData.mac = crypto.createHmac('sha256', this.config.key1)
+      .update(dataStr)
+      .digest('hex');
     console.log(`Chữ ký được tạo: ${refundData.mac}`);
 
     try {
@@ -688,7 +688,6 @@ class ZaloPayService {
 
   static async sendPaymentConfirmation(booking, payment) {
     try {
-      // Ensure booking is populated with necessary data
       await booking.populate([
         { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
         { path: 'user', select: 'name email' },
@@ -704,7 +703,6 @@ class ZaloPayService {
         relatedId: booking._id
       });
 
-      // Tạo HTML hóa đơn
       const htmlContent = getInvoiceTemplate({
         _id: booking._id,
         room: booking.room,
@@ -721,7 +719,6 @@ class ZaloPayService {
         hotel: booking.room?.hotelId,
       });
 
-      // Tạo PDF
       let pdfBuffer;
       try {
         pdfBuffer = await generatePDF(htmlContent);
@@ -746,7 +743,6 @@ class ZaloPayService {
         <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>
       `;
 
-      // Gửi email với PDF đính kèm
       try {
         await sendEmail({
           email: booking.user.email,
