@@ -133,7 +133,7 @@ app.use("/api/statistics", statisticsRoutes);
 app.use("/api/admin-statistics", adminStatisticsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/webhook", webhook);
-app.use("api/upload", upload);
+app.use("api/uploads", upload);
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
