@@ -400,6 +400,7 @@ exports.createBooking = async (req, res) => {
       success: true,
       data: booking,
       paymentUrl: paymentUrl.payUrl,
+      transactionId: paymentUrl.transactionId,
     });
   } catch (error) {
     await session.abortTransaction();
