@@ -286,102 +286,133 @@ exports.createBooking = async (req, res) => {
         ? "Thẻ tín dụng"
         : "PayPal";
 
-    // Create email message with correct hotel information
-    const message = `
-      <h1>Xác nhận đặt phòng</h1>
-      <p>Thông tin đặt phòng:</p>
-      <ul>
-        <li>Khách sạn: ${hotelName}</li>
-        <li>Địa chỉ: ${hotelAddress}</li>
-        <li>Loại phòng: ${roomTypeName}</li>
-        <li>Tên phòng: ${room.name}</li>
-        <li>Ngày check-in: ${new Date(booking.checkIn).toLocaleDateString(
-          "vi-VN"
-        )}</li>
-        <li>Ngày check-out: ${new Date(booking.checkOut).toLocaleDateString(
-          "vi-VN"
-        )}</li>
-        <li>Số đêm: ${numberOfDays}</li>
-        <li>Giá gốc: ${booking.originalPrice.toLocaleString("vi-VN")}đ</li>
-        ${
-          booking.voucher ? `<li>Mã giảm giá: ${booking.voucher.code}</li>` : ""
-        }
-        ${
-          booking.discountAmount > 0
-            ? `<li>Giảm giá: ${booking.discountAmount.toLocaleString(
-                "vi-VN"
-              )}đ</li>`
-            : ""
-        }
-        <li>Tổng thanh toán: ${booking.finalPrice.toLocaleString("vi-VN")}đ</li>
-        <li>Phương thức thanh toán: ${formattedPaymentMethod}</li>
-      </ul>
+    // Function to create email content
+    const createEmailContent = (isForBooker = true) => {
+      const recipientInfo = isForBooker ? contactInfo : guestInfo;
+      const recipientName = recipientInfo.name;
       
-      <h2>Thông tin liên hệ:</h2>
-      <ul>
-        <li>Tên người đặt: ${contactInfo.name}</li>
-        <li>Email: ${contactInfo.email}</li>
-        <li>Số điện thoại: ${contactInfo.phone}</li>
-      </ul>
-      
-      ${
-        bookingFor === "other"
-          ? `
+      return `
+        <h1>Xác nhận đặt phòng</h1>
+        ${isForBooker 
+          ? `<p>Chào ${recipientName},</p>
+             <p>Cảm ơn bạn đã đặt phòng ${bookingFor === "other" ? "cho " + guestInfo.name : ""} tại khách sạn của chúng tôi.</p>` 
+          : `<p>Chào ${recipientName},</p>
+             <p>Bạn có một đặt phòng được thực hiện bởi ${contactInfo.name}. Dưới đây là thông tin chi tiết:</p>`
+        }
+        
+        <h2>Thông tin đặt phòng:</h2>
+        <ul>
+          <li>Khách sạn: ${hotelName}</li>
+          <li>Địa chỉ: ${hotelAddress}</li>
+          <li>Loại phòng: ${roomTypeName}</li>
+          <li>Tên phòng: ${room.name}</li>
+          <li>Ngày check-in: ${new Date(booking.checkIn).toLocaleDateString("vi-VN")} (14:00)</li>
+          <li>Ngày check-out: ${new Date(booking.checkOut).toLocaleDateString("vi-VN")} (12:00)</li>
+          <li>Số đêm: ${numberOfDays}</li>
+          ${isForBooker ? `
+          <li>Giá gốc: ${booking.originalPrice.toLocaleString("vi-VN")}đ</li>
+          ${booking.voucher ? `<li>Mã giảm giá: ${booking.voucher.code}</li>` : ""}
+          ${booking.discountAmount > 0 ? `<li>Giảm giá: ${booking.discountAmount.toLocaleString("vi-VN")}đ</li>` : ""}
+          <li>Tổng thanh toán: ${booking.finalPrice.toLocaleString("vi-VN")}đ</li>
+          <li>Phương thức thanh toán: ${formattedPaymentMethod}</li>
+          ` : `<li>Tổng chi phí: ${booking.finalPrice.toLocaleString("vi-VN")}đ</li>`}
+        </ul>
+        
+        <h2>Thông tin người đặt phòng:</h2>
+        <ul>
+          <li>Tên: ${contactInfo.name}</li>
+          <li>Email: ${contactInfo.email}</li>
+          <li>Số điện thoại: ${contactInfo.phone}</li>
+        </ul>
+        
+        ${bookingFor === "other" ? `
         <h2>Thông tin người lưu trú:</h2>
         <ul>
           <li>Tên: ${guestInfo.name}</li>
           <li>Email: ${guestInfo.email || "Không có"}</li>
           <li>Số điện thoại: ${guestInfo.phone}</li>
         </ul>
-      `
-          : ""
-      }
-      
-      ${
-        specialRequests.earlyCheckIn ||
-        specialRequests.lateCheckOut ||
-        specialRequests.additionalRequests
-          ? `<h2>Yêu cầu đặc biệt:</h2>
+        ` : ""}
+        
+        ${specialRequests.earlyCheckIn || specialRequests.lateCheckOut || specialRequests.additionalRequests ? `
+        <h2>Yêu cầu đặc biệt:</h2>
         <ul>
           ${specialRequests.earlyCheckIn ? "<li>Yêu cầu check-in sớm</li>" : ""}
-          ${
-            specialRequests.lateCheckOut
-              ? "<li>Yêu cầu check-out muộn</li>"
-              : ""
-          }
-          ${
-            specialRequests.additionalRequests
-              ? `<li>Yêu cầu khác: ${specialRequests.additionalRequests}</li>`
-              : ""
-          }
-        </ul>`
-          : ""
-      }
-      
-      <p>Trạng thái: Chờ xác nhận</p>
-      <p><strong>Mã đặt phòng:</strong> ${booking._id}</p>
-    `;
+          ${specialRequests.lateCheckOut ? "<li>Yêu cầu check-out muộn</li>" : ""}
+          ${specialRequests.additionalRequests ? `<li>Yêu cầu khác: ${specialRequests.additionalRequests}</li>` : ""}
+        </ul>
+        ` : ""}
+        
+        <p><strong>Trạng thái:</strong> Chờ xác nhận</p>
+        <p><strong>Mã đặt phòng:</strong> ${booking._id}</p>
+        
+        ${isForBooker ? `
+        <h2>Lưu ý quan trọng:</h2>
+        <ul>
+          <li>Vui lòng mang theo giấy tờ tùy thân khi check-in</li>
+          <li>Check-in: 14:00 | Check-out: 12:00</li>
+          <li>Nếu có thắc mắc, vui lòng liên hệ với chúng tôi</li>
+        </ul>
+        ` : `
+        <h2>Hướng dẫn check-in:</h2>
+        <ul>
+          <li>Mang theo giấy tờ tùy thân và mã đặt phòng: ${booking._id}</li>
+          <li>Thời gian check-in: 14:00 ngày ${new Date(booking.checkIn).toLocaleDateString("vi-VN")}</li>
+          <li>Thời gian check-out: 12:00 ngày ${new Date(booking.checkOut).toLocaleDateString("vi-VN")}</li>
+          <li>Liên hệ người đặt: ${contactInfo.name} - ${contactInfo.phone}</li>
+        </ul>
+        `}
+        
+        <p>Cảm ơn bạn đã chọn dịch vụ của chúng tôi!</p>
+      `;
+    };
 
+    // Send emails
+    const emailPromises = [];
+    const emailResults = {
+      booker: { sent: false, error: null },
+      guest: { sent: false, error: null }
+    };
+    
     try {
-      console.log("Sending email to:", contactInfo.email);
-      console.log("Email content preview:", {
-        hotelName,
-        hotelAddress,
-        roomType: roomTypeName
-      });
-      
-      await sendEmail({
+      // Gửi email cho người đặt phòng
+      console.log(`Attempting to send booking confirmation email to booker: ${contactInfo.email}`);
+      const bookerEmailPromise = sendEmail({
         email: contactInfo.email,
-        subject: `Xác nhận đặt phòng tại ${hotelName}`,
-        message,
+        subject: `Xác nhận đặt phòng tại ${hotelName} - Mã: ${booking._id.toString().slice(-8)}`,
+        message: createEmailContent(true),
+      }).then(() => {
+        console.log(`Successfully sent booking confirmation email to booker: ${contactInfo.email}`);
+        emailResults.booker.sent = true;
+      }).catch(error => {
+        console.error(`Failed to send booking confirmation email to booker: ${contactInfo.email}`, error);
+        emailResults.booker.error = error.message;
       });
-      console.log("Email sent successfully");
+      emailPromises.push(bookerEmailPromise);
+
+      // Gửi email cho người lưu trú nếu đặt cho người khác và có email
+      if (bookingFor === "other" && guestInfo.email && guestInfo.email.trim() !== "") {
+        console.log(`Attempting to send booking notification email to guest: ${guestInfo.email}`);
+        const guestEmailPromise = sendEmail({
+          email: guestInfo.email,
+          subject: `Thông báo đặt phòng tại ${hotelName} - Mã: ${booking._id.toString().slice(-8)}`,
+          message: createEmailContent(false),
+        }).then(() => {
+          console.log(`Successfully sent booking notification email to guest: ${guestInfo.email}`);
+          emailResults.guest.sent = true;
+        }).catch(error => {
+          console.error(`Failed to send booking notification email to guest: ${guestInfo.email}`, error);
+          emailResults.guest.error = error.message;
+        });
+        emailPromises.push(guestEmailPromise);
+      }
+
+      // Chờ tất cả email được gửi
+      await Promise.allSettled(emailPromises);
+      console.log("Email sending process completed", emailResults);
+      
     } catch (emailError) {
-      console.error(
-        "Lỗi gửi email xác nhận đặt phòng:",
-        emailError.message,
-        emailError.stack
-      );
+      console.error("Error in email sending process:", emailError.message, emailError.stack);
       // Log lỗi nhưng không làm gián đoạn quá trình tạo booking
     }
 
@@ -401,6 +432,16 @@ exports.createBooking = async (req, res) => {
       data: booking,
       paymentUrl: paymentUrl.payUrl,
       transactionId: paymentUrl.transactionId,
+      emailStatus: {
+        booker: {
+          sent: emailResults.booker.sent,
+          error: emailResults.booker.error
+        },
+        guest: bookingFor === "other" ? {
+          sent: emailResults.guest.sent,
+          error: emailResults.guest.error
+        } : null
+      }
     });
   } catch (error) {
     await session.abortTransaction();

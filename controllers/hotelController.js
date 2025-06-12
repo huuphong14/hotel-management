@@ -1018,10 +1018,11 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       checkIn,
       checkOut,
       capacity,
-      hotelName,
       minPrice,
       maxPrice,
-      roomType,
+      minRating,
+      maxRating,
+      roomTypes,
       amenities,
       sort = "price",
       page = 1,
@@ -1032,9 +1033,42 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     if (!locationName || !checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message:
-          "Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người",
+        message: "Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người",
       });
+    }
+
+    // Validate rating range if provided
+    if (minRating && (isNaN(minRating) || minRating < 0 || minRating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: "Đánh giá tối thiểu phải từ 0 đến 5",
+      });
+    }
+    if (maxRating && (isNaN(maxRating) || maxRating < 0 || maxRating > 5)) {
+      return res.status(400).json({
+        success: false,
+        message: "Đánh giá tối đa phải từ 0 đến 5",
+      });
+    }
+    if (minRating && maxRating && Number(minRating) > Number(maxRating)) {
+      return res.status(400).json({
+        success: false,
+        message: "Đánh giá tối thiểu không thể lớn hơn đánh giá tối đa",
+      });
+    }
+
+    // Validate room types if provided
+    let roomTypesArray = [];
+    if (roomTypes) {
+      roomTypesArray = roomTypes.split(',').map(type => type.trim());
+      const validRoomTypes = ['Standard', 'Superior', 'Deluxe', 'Suite', 'Family'];
+      const invalidTypes = roomTypesArray.filter(type => !validRoomTypes.includes(type));
+      if (invalidTypes.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Loại phòng không hợp lệ: ${invalidTypes.join(', ')}. Các loại phòng hợp lệ: ${validRoomTypes.join(', ')}`,
+        });
+      }
     }
 
     const checkInDate = new Date(checkIn);
@@ -1064,96 +1098,59 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       });
     }
 
-    // Find hotels
-    const hotelQuery = { locationId: location._id, status: "active" };
-    if (hotelName) {
-      hotelQuery.name = { $regex: hotelName, $options: "i" };
-    }
-    const hotels = await Hotel.find(hotelQuery).select("_id");
-    const hotelIds = hotels.map((h) => h._id);
-    if (hotelIds.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Không tìm thấy khách sạn tại địa điểm này",
-      });
-    }
-
     // Build room query
     const roomQuery = {
-      hotelId: { $in: hotelIds },
       capacity: { $gte: Number(capacity) },
+      status: "available",
     };
-    if (roomType) {
-      roomQuery.roomType = roomType;
-    }
-    if (amenities) {
-      const amenitiesArray = Array.isArray(amenities)
-        ? amenities
-        : amenities.split(",");
-      const objectIds = amenitiesArray.map(
-        (id) => new mongoose.Types.ObjectId(id)
-      );
-      roomQuery.amenities = { $all: objectIds };
+
+    // Thêm điều kiện lọc theo loại phòng nếu có
+    if (roomTypesArray.length > 0) {
+      roomQuery.roomType = { $in: roomTypesArray };
     }
 
-    // Sort options
-    const sortOptions = {};
-    if (sort === "price") sortOptions.discountedPrice = 1;
-    else if (sort === "-price") sortOptions.discountedPrice = -1;
-    else if (sort === "rating") sortOptions["hotelId.rating"] = 1;
-    else if (sort === "-rating") sortOptions["hotelId.rating"] = -1;
-    else if (sort === "discountPercent") sortOptions.discountPercent = 1;
-    else if (sort === "-discountPercent") sortOptions.discountPercent = -1;
-
-    // Fetch available rooms
-    const rooms = await RoomService.findAvailableRooms(
+    // Fetch available rooms with hotels
+    const hotels = await RoomService.findAvailableRooms(
       roomQuery,
       checkInDate,
       checkOutDate,
       {
-        sort: sortOptions,
+        sort,
         skip: (Number(page) - 1) * Number(limit),
         limit: Number(limit),
         minPrice,
         maxPrice,
+        locationId: location._id,
+        minRating: minRating ? Number(minRating) : undefined,
+        maxRating: maxRating ? Number(maxRating) : undefined,
+        amenities: amenities ? amenities.split(',').map(id => id.trim()) : undefined
       }
     );
 
-    // Group by hotel
-    const hotelMap = new Map();
-    rooms.forEach((room) => {
-      const hotelId = room.hotelId._id.toString();
-      if (!hotelMap.has(hotelId)) {
-        hotelMap.set(hotelId, {
-          _id: room.hotelId._id,
-          name: room.hotelId.name,
-          address: room.hotelId.address,
-          rating: room.hotelId.rating,
-          images: room.hotelId.images,
-          featuredImage: room.hotelId.featuredImage,
-          policies: room.hotelId.policies,
-          amenities: room.hotelId.amenities,
-          lowestPrice: room.hotelId.lowestPrice,
-          lowestDiscountedPrice: room.hotelId.lowestDiscountedPrice,
-          highestDiscountPercent: room.hotelId.highestDiscountPercent,
-          availableRoomCount: 0,
-        });
+    // Get total count for pagination
+    const totalHotels = await RoomService.countAvailableHotels(
+      roomQuery,
+      checkInDate,
+      checkOutDate,
+      { 
+        minPrice, 
+        maxPrice,
+        locationId: location._id,
+        minRating: minRating ? Number(minRating) : undefined,
+        maxRating: maxRating ? Number(maxRating) : undefined,
+        amenities: amenities ? amenities.split(',').map(id => id.trim()) : undefined
       }
-      hotelMap.get(hotelId).availableRoomCount += 1;
-    });
-
-    const hotelsWithAvailableRooms = Array.from(hotelMap.values());
-    const total = hotelsWithAvailableRooms.length;
+    );
 
     res.status(200).json({
       success: true,
-      count: hotelsWithAvailableRooms.length,
-      total,
+      count: hotels.length,
+      total: totalHotels,
       pagination: {
         currentPage: Number(page),
-        totalPages: Math.ceil(total / Number(limit)),
+        totalPages: Math.ceil(totalHotels / Number(limit)),
       },
-      data: hotelsWithAvailableRooms,
+      data: hotels,
     });
   } catch (error) {
     console.error("Search hotels error:", {
@@ -1243,7 +1240,6 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  *       500:
  *         description: Lỗi server
  */
-
 exports.getAvailableRoomsByHotel = async (req, res) => {
   try {
     const { hotelId } = req.params;
@@ -1260,19 +1256,11 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
       limit = 10,
     } = req.query;
 
-    console.log(
-      "getAvailableRoomsByHotel - Query params:",
-      req.query,
-      "Hotel ID:",
-      hotelId
-    );
-
     // Validate input
     if (!checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message:
-          "Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người",
+        message: "Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người",
       });
     }
 
@@ -1291,25 +1279,9 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
       });
     }
 
-    // Validate sort
-    const validSortValues = [
-      "price",
-      "-price",
-      "discountPercent",
-      "-discountPercent",
-    ];
-    if (sort && !validSortValues.includes(sort)) {
-      return res.status(400).json({
-        success: false,
-        message: `Giá trị sort không hợp lệ. Chấp nhận: ${validSortValues.join(
-          ", "
-        )}`,
-      });
-    }
-
-    // Validate hotel
-    const hotel = await Hotel.findById(hotelId);
-    if (!hotel || hotel.status !== "active") {
+    // Validate hotel exists and is active
+    const hotel = await Hotel.findOne({ _id: hotelId, status: 'active' });
+    if (!hotel) {
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy khách sạn hoặc khách sạn không hoạt động",
@@ -1318,55 +1290,31 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
 
     // Build room query
     const roomQuery = {
-      hotelId: new mongoose.Types.ObjectId(hotelId),
       capacity: { $gte: Number(capacity) },
     };
+
     if (roomType) {
       roomQuery.roomType = roomType;
     }
+
     if (amenities) {
-      const amenitiesArray = Array.isArray(amenities)
-        ? amenities
-        : amenities.split(",");
-      roomQuery.amenities = { $all: amenitiesArray };
+      const amenityIds = amenities.split(",").map((id) => id.trim());
+      roomQuery.amenities = { $all: amenityIds };
     }
 
-    // Sort options
-    const sortOptions = {};
-    if (sort === "price") sortOptions.discountedPrice = 1;
-    else if (sort === "-price") sortOptions.discountedPrice = -1;
-    else if (sort === "discountPercent") sortOptions.discountPercent = 1;
-    else if (sort === "-discountPercent") sortOptions.discountPercent = -1;
-
-    // Fetch available rooms
-    const rooms = await RoomService.findAvailableRooms(
+    // Get available rooms
+    const { rooms, total } = await RoomService.getAvailableRoomsByHotel(
+      hotelId,
       roomQuery,
       checkInDate,
       checkOutDate,
       {
-        sort: sortOptions,
+        sort,
         skip: (Number(page) - 1) * Number(limit),
         limit: Number(limit),
         minPrice,
         maxPrice,
       }
-    );
-
-    // Count total rooms
-    const total = (
-      await RoomService.findAvailableRooms(
-        roomQuery,
-        checkInDate,
-        checkOutDate,
-        { minPrice, maxPrice }
-      )
-    ).length;
-
-    console.log(
-      "Available rooms for hotel",
-      hotelId,
-      ":",
-      rooms.map((room) => room._id.toString())
     );
 
     res.status(200).json({
@@ -1377,7 +1325,7 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         currentPage: Number(page),
         totalPages: Math.ceil(total / Number(limit)),
       },
-      data: rooms.map((room) => ({
+      data: rooms.map(room => ({
         _id: room._id,
         name: room.name,
         description: room.description,
@@ -1386,19 +1334,13 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         bedType: room.bedType,
         price: room.price,
         discountedPrice: room.discountedPrice,
-        discountPercent: room.discountPercent,
-        discountStartDate: room.discountStartDate,
-        discountEndDate: room.discountEndDate,
+        discountPercent: room.currentDiscountPercent,
         capacity: room.capacity,
         squareMeters: room.squareMeters,
-        amenities: room.amenities, // Contains full objects: {_id, name, type, icon}
+        amenities: room.amenities,
         images: room.images,
-        cancellationPolicy: room.cancellationPolicy,
-        status: room.status,
-        hasDiscount: room.hasDiscount,
-        createdAt: room.createdAt,
-        updatedAt: room.updatedAt,
-      })),
+        status: room.status
+      }))
     });
   } catch (error) {
     console.error("Get available rooms error:", {

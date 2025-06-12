@@ -42,11 +42,9 @@ const ReviewSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Tạo index cho tìm kiếm
 ReviewSchema.index({ hotelId: 1, createdAt: -1 });
-ReviewSchema.index({ userId: 1, hotelId: 1 }, { unique: true }); // Mỗi user chỉ được đánh giá 1 lần cho mỗi khách sạn
+ReviewSchema.index({ userId: 1, hotelId: 1 }, { unique: true });
 
-// Tính lại rating trung bình cho khách sạn sau khi thêm/sửa/xóa đánh giá
 ReviewSchema.statics.calculateAverageRating = async function(hotelId) {
   const stats = await this.aggregate([
     {
@@ -55,28 +53,28 @@ ReviewSchema.statics.calculateAverageRating = async function(hotelId) {
     {
       $group: {
         _id: '$hotelId',
-        averageRating: { $avg: '$rating' }
+        averageRating: { $avg: '$rating' },
+        reviewCount: { $sum: 1 }
       }
     }
   ]);
 
   try {
     await mongoose.model('Hotel').findByIdAndUpdate(hotelId, {
-      rating: stats[0]?.averageRating || 0
+      rating: stats[0]?.averageRating || 0,
+      reviewCount: stats[0]?.reviewCount || 0
     });
   } catch (err) {
     console.error(err);
   }
 };
 
-// Middleware để tính lại rating sau khi lưu
 ReviewSchema.post('save', function() {
   this.constructor.calculateAverageRating(this.hotelId);
 });
 
-// Middleware để tính lại rating trước khi xóa
 ReviewSchema.pre('remove', function() {
   this.constructor.calculateAverageRating(this.hotelId);
 });
 
-module.exports = mongoose.model('Review', ReviewSchema); 
+module.exports = mongoose.model('Review', ReviewSchema);

@@ -44,10 +44,9 @@ const Booking = require("../models/Booking");
  */
 exports.createReview = async (req, res) => {
   try {
-    // Lấy dữ liệu từ body của request
     const { hotelId, rating, title, comment, isAnonymous } = req.body;
 
-    // Kiểm tra xem khách sạn có tồn tại trong cơ sở dữ liệu không
+    // Kiểm tra xem khách sạn có tồn tại không
     const hotel = await Hotel.findById(hotelId);
     if (!hotel) {
       console.warn(`Không tìm thấy khách sạn với ID: ${hotelId}`);
@@ -57,7 +56,7 @@ exports.createReview = async (req, res) => {
       });
     }
 
-    // Kiểm tra xem người dùng đã có đặt phòng hoàn thành tại khách sạn này chưa
+    // Kiểm tra xem người dùng có đặt phòng hoàn thành tại khách sạn này chưa
     const hasBooking = await Booking.findOne({
       user: req.user.id,
       status: "completed",
@@ -78,7 +77,7 @@ exports.createReview = async (req, res) => {
       });
     }
 
-    // Kiểm tra xem người dùng đã đánh giá khách sạn này trước đó chưa
+    // Kiểm tra xem người dùng đã đánh giá khách sạn này chưa
     const existingReview = await Review.findOne({
       userId: req.user.id,
       hotelId,
@@ -93,7 +92,7 @@ exports.createReview = async (req, res) => {
       });
     }
 
-    // Tạo đánh giá mới trong cơ sở dữ liệu
+    // Tạo đánh giá mới
     const review = await Review.create({
       userId: req.user.id,
       hotelId,
@@ -103,10 +102,12 @@ exports.createReview = async (req, res) => {
       isAnonymous,
     });
 
-    // Lấy thông tin tên người dùng (trừ khi đánh giá ẩn danh)
+    // Điền thông tin tên người dùng (trừ khi ẩn danh)
     await review.populate({ path: "userId", select: "name" });
 
-    // Ghi log xác nhận tạo đánh giá thành công
+    // Cập nhật điểm trung bình và số lượng đánh giá của khách sạn
+    await Review.calculateAverageRating(hotelId);
+
     console.log(
       `Tạo đánh giá thành công cho khách sạn: ${hotelId} bởi người dùng: ${req.user.id}`
     );
@@ -115,7 +116,6 @@ exports.createReview = async (req, res) => {
       data: review,
     });
   } catch (error) {
-    // Ghi log lỗi nếu có vấn đề xảy ra
     console.error("Lỗi khi tạo đánh giá:", error);
     res.status(500).json({
       success: false,
@@ -160,7 +160,7 @@ exports.getHotelReviews = async (req, res) => {
       });
     }
 
-    // Tìm tất cả đánh giá của khách sạn và sắp xếp theo thời gian tạo (mới nhất trước)
+    // Lấy tất cả đánh giá của khách sạn, sắp xếp theo thời gian tạo
     const reviews = await Review.find({ hotelId: req.params.hotelId })
       .populate({
         path: "userId",
@@ -274,6 +274,8 @@ exports.updateReview = async (req, res) => {
         runValidators: true,
       }
     );
+
+    // Cập nhật điểm trung bình và số lượng đánh giá
     await Review.calculateAverageRating(review.hotelId);
 
     console.log(
@@ -354,7 +356,7 @@ exports.respondToReview = async (req, res) => {
       });
     }
 
-    // Lưu phản hồi vào đánh giá
+    // Lưu phản hồi
     review.response = req.body.response;
     await review.save();
 
@@ -427,9 +429,12 @@ exports.deleteReview = async (req, res) => {
       });
     }
 
-    // Xóa đánh giá khỏi cơ sở dữ liệu
-    review.deleteOne();
-    Review.calculateAverageRating(review.hotelId);
+    // Xóa đánh giá
+    await review.deleteOne();
+
+    // Cập nhật điểm trung bình và số lượng đánh giá
+    await Review.calculateAverageRating(review.hotelId);
+
     console.log(`Xóa đánh giá với ID: ${req.params.id} thành công`);
 
     res.status(200).json({

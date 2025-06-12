@@ -70,3 +70,39 @@ exports.updateHotelLowestPrice = async (hotelId) => {
     throw error;
   }
 };
+
+exports.clearExpiredRoomDiscounts = async (hotelId) => {
+  try {
+    const currentDate = new Date();
+
+    // Tìm các phòng có giảm giá đã hết hạn
+    const expiredRooms = await Room.find({
+      hotelId,
+      discountPercent: { $gt: 0 },
+      discountEndDate: { $lt: currentDate },
+    });
+
+    if (expiredRooms.length === 0) {
+      console.log(`Không có phòng nào hết hạn giảm giá cho khách sạn ${hotelId}`);
+      return;
+    }
+
+    // Cập nhật các phòng, xóa thông tin giảm giá
+    const roomIds = expiredRooms.map(room => room._id);
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $set: {
+          discountPercent: 0,
+          discountStartDate: null,
+          discountEndDate: null,
+        },
+      }
+    );
+
+    console.log(`Đã xóa giảm giá cho ${expiredRooms.length} phòng của khách sạn ${hotelId}`);
+  } catch (error) {
+    console.error(`Lỗi khi xóa giảm giá hết hạn cho khách sạn ${hotelId}:`, error);
+    throw error;
+  }
+};

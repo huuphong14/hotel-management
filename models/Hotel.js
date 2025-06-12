@@ -26,6 +26,11 @@ const HotelSchema = new mongoose.Schema(
       min: [0, 'Đánh giá không thể nhỏ hơn 0'],
       max: [5, 'Đánh giá không thể lớn hơn 5']
     },
+    reviewCount: {
+      type: Number,
+      default: 0,
+      min: [0, 'Số lượng đánh giá không thể nhỏ hơn 0']
+    },
     description: {
       type: String,
       trim: true,
@@ -108,12 +113,12 @@ const HotelSchema = new mongoose.Schema(
     }
   },
   {
-    timestamps: true // Tự động thêm createdAt và updatedAt
+    timestamps: true
   }
 );
 
-
-// Tạo index cho tìm kiếm theo tên
 HotelSchema.index({ name: 'text' });
+HotelSchema.index({ locationId: 1, status: 1 });
+HotelSchema.index({ rating: 1 });
 
 module.exports = mongoose.model("Hotel", HotelSchema);
