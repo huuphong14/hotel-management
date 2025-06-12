@@ -8,7 +8,7 @@ class DialogflowController {
     const config = this.config.getConfig();
 
     this.sessionsClient = new SessionsClient({
-      credentials: JSON.parse(config.credentialsJson),
+      credentials: JSON.parse(config.credentialsJson.replace(/^'|'$/g, "")),
       apiEndpoint: `${config.location}-dialogflow.googleapis.com`,
     });
     this.projectId = config.projectId;

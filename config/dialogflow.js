@@ -39,7 +39,8 @@ class DialogflowConfig {
     }
 
     try {
-      JSON.parse(this.config.credentialsJson);
+      const jsonStr = this.config.credentialsJson.replace(/^'|'$/g, "");
+      JSON.parse(jsonStr);
     } catch (error) {
       const errorMsg = `Invalid Google credentials JSON: ${error.message}`;
       console.error(errorMsg);
