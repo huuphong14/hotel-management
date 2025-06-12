@@ -20,7 +20,7 @@ const generateOTP = () => {
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Đăng ký tài khoản người dùng
+ *     summary: "Đăng ký tài khoản người dùng"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -41,11 +41,11 @@ const generateOTP = () => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Đăng ký thành công, gửi email xác nhận
+ *         description: "Đăng ký thành công, gửi email xác nhận"
  *       400:
- *         description: Dữ liệu không hợp lệ hoặc email đã tồn tại
+ *         description: "Dữ liệu không hợp lệ hoặc email đã tồn tại"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.register = async (req, res) => {
   try {
@@ -124,7 +124,7 @@ exports.register = async (req, res) => {
  * @swagger
  * /api/auth/verify-email/{token}:
  *   get:
- *     summary: Xác thực email
+ *     summary: "Xác thực email"
  *     tags: [Auth]
  *     parameters:
  *       - in: path
@@ -132,14 +132,14 @@ exports.register = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: Token xác thực email
+ *         description: "Token xác thực email"
  *     responses:
  *       200:
- *         description: Xác thực email thành công
+ *         description: "Xác thực email thành công"
  *       400:
- *         description: Token không hợp lệ hoặc đã hết hạn
+ *         description: "Token không hợp lệ hoặc đã hết hạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.verifyEmail = async (req, res) => {
   try {
@@ -181,7 +181,7 @@ exports.verifyEmail = async (req, res) => {
  * @swagger
  * /api/auth/login:
  *   post:
- *     summary: Đăng nhập
+ *     summary: "Đăng nhập"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -199,11 +199,11 @@ exports.verifyEmail = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Đăng nhập thành công
+ *         description: "Đăng nhập thành công"
  *       401:
- *         description: Thông tin đăng nhập không chính xác
+ *         description: "Thông tin đăng nhập không chính xác"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.login = async (req, res) => {
   try {
@@ -251,15 +251,15 @@ exports.login = async (req, res) => {
  * @swagger
  * /api/auth/me:
  *   get:
- *     summary: Lấy thông tin người dùng hiện tại
+ *     summary: "Lấy thông tin người dùng hiện tại"
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thông tin thành công
+ *         description: "Lấy thông tin thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getMe = async (req, res) => {
   try {
@@ -280,15 +280,15 @@ exports.getMe = async (req, res) => {
  * @swagger
  * /api/auth/logout:
  *   get:
- *     summary: Đăng xuất
+ *     summary: "Đăng xuất"
  *     tags: [Auth]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Đăng xuất thành công
+ *         description: "Đăng xuất thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.logout = async (req, res) => {
   try {
@@ -324,19 +324,19 @@ exports.logout = async (req, res) => {
  * @swagger
  * /api/auth/refresh-token:
  *   post:
- *     summary: Làm mới access token
+ *     summary: "Làm mới access token"
  *     tags: [Auth]
  *     requestBody:
  *       required: false
  *     responses:
  *       200:
- *         description: Trả về access token mới
+ *         description: "Trả về access token mới"
  *       401:
- *         description: Không có refresh token
+ *         description: "Không có refresh token"
  *       403:
- *         description: Refresh token không hợp lệ hoặc hết hạn
+ *         description: "Refresh token không hợp lệ hoặc hết hạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.refreshToken = async (req, res) => {
   try {
@@ -376,7 +376,7 @@ exports.refreshToken = async (req, res) => {
  * @swagger
  * /api/auth/password/forgot:
  *   post:
- *     summary: Gửi mã OTP đặt lại mật khẩu
+ *     summary: "Gửi mã OTP đặt lại mật khẩu"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -391,11 +391,11 @@ exports.refreshToken = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Gửi mã OTP thành công
+ *         description: "Gửi mã OTP thành công"
  *       404:
- *         description: Email không tồn tại
+ *         description: "Email không tồn tại"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.sendOTP = async (req, res) => {
   try {
@@ -430,7 +430,7 @@ exports.sendOTP = async (req, res) => {
  * @swagger
  * /api/auth/password/verify-otp:
  *   post:
- *     summary: Xác thực mã OTP
+ *     summary: "Xác thực mã OTP"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -448,11 +448,11 @@ exports.sendOTP = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Xác thực OTP thành công
+ *         description: "Xác thực OTP thành công"
  *       400:
- *         description: OTP không hợp lệ hoặc đã hết hạn
+ *         description: "OTP không hợp lệ hoặc đã hết hạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.verifyOTP = async (req, res) => {
   try {
@@ -489,7 +489,7 @@ exports.verifyOTP = async (req, res) => {
  * @swagger
  * /api/auth/password/reset:
  *   post:
- *     summary: Đặt lại mật khẩu
+ *     summary: "Đặt lại mật khẩu"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -510,11 +510,11 @@ exports.verifyOTP = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Đặt lại mật khẩu thành công
+ *         description: "Đặt lại mật khẩu thành công"
  *       400:
- *         description: OTP không hợp lệ hoặc đã hết hạn
+ *         description: "OTP không hợp lệ hoặc đã hết hạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.resetPassword = async (req, res) => {
   try {
@@ -580,11 +580,11 @@ exports.resetPassword = async (req, res) => {
  * @swagger
  * /api/auth/google:
  *   get:
- *     summary: Đăng nhập bằng Google
+ *     summary: "Đăng nhập bằng Google"
  *     tags: [Auth]
  *     responses:
  *       302:
- *         description: Chuyển hướng sang Google để xác thực
+ *         description: "Chuyển hướng sang Google để xác thực"
  */
 exports.googleAuth = passport.authenticate("google", {
   scope: ["profile", "email"],
@@ -594,11 +594,11 @@ exports.googleAuth = passport.authenticate("google", {
  * @swagger
  * /api/auth/google/callback:
  *   get:
- *     summary: Callback sau khi đăng nhập Google
+ *     summary: "Callback sau khi đăng nhập Google" 
  *     tags: [Auth]
  *     responses:
  *       302:
- *         description: Chuyển hướng về frontend với token
+ *         description: "Chuyển hướng về frontend với token"
  */
 exports.googleCallback = async (req, res) => {
   try {
@@ -677,11 +677,11 @@ exports.googleCallback = async (req, res) => {
  * @swagger
  * /api/auth/facebook:
  *   get:
- *     summary: Đăng nhập bằng Facebook
+ *     summary: "Đăng nhập bằng Facebook"
  *     tags: [Auth]
  *     responses:
  *       302:
- *         description: Chuyển hướng sang Facebook để xác thực
+ *         description: "Chuyển hướng sang Facebook để xác thực"
  */
 exports.facebookAuth = passport.authenticate("facebook", {
   scope: ["email"],
@@ -691,11 +691,11 @@ exports.facebookAuth = passport.authenticate("facebook", {
  * @swagger
  * /api/auth/facebook/callback:
  *   get:
- *     summary: Callback sau khi đăng nhập Facebook
+ *     summary: "Callback sau khi đăng nhập Facebook"
  *     tags: [Auth]
  *     responses:
  *       302:
- *         description: Chuyển hướng về frontend với token
+ *         description: "Chuyển hướng về frontend với token"
  */
 exports.facebookCallback = async (req, res) => {
   try {
@@ -774,7 +774,7 @@ exports.facebookCallback = async (req, res) => {
  * @swagger
  * /api/auth/register-partner:
  *   post:
- *     summary: Đăng ký đối tác và tạo khách sạn
+ *     summary: "Đăng ký đối tác và tạo khách sạn"
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -801,11 +801,11 @@ exports.facebookCallback = async (req, res) => {
  *               - smokingPolicy
  *     responses:
  *       201:
- *         description: Đăng ký đối tác và khách sạn thành công
+ *         description: "Đăng ký đối tác và khách sạn thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ hoặc email đã tồn tại
+ *         description: "Dữ liệu không hợp lệ hoặc email đã tồn tại"
  *       500:
- *         description: Lỗi server khi đăng ký đối tác và khách sạn
+ *         description: "Lỗi server khi đăng ký đối tác và khách sạn"
  */
 exports.registerPartner = asyncHandler(async (req, res) => {
   const session = await mongoose.startSession();
@@ -1078,11 +1078,11 @@ exports.registerPartner = asyncHandler(async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: Đã phê duyệt tài khoản đối tác và gửi thông tin đăng nhập
+ *         description: "Đã phê duyệt tài khoản đối tác và gửi thông tin đăng nhập"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.approvePartner = async (req, res) => {
   try {
@@ -1184,13 +1184,13 @@ exports.approvePartner = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Đã từ chối tài khoản đối tác
+ *         description: "Đã từ chối tài khoản đối tác"
  *       400:
- *         description: Vui lòng cung cấp lý do từ chối
+ *         description: "Vui lòng cung cấp lý do từ chối"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.rejectPartner = async (req, res) => {
   try {
@@ -1268,13 +1268,13 @@ exports.rejectPartner = async (req, res) => {
  * @swagger
  * /api/auth/pending-partners:
  *   get:
- *     summary: Lấy danh sách đối tác chờ duyệt
+ *     summary: "Lấy danh sách đối tác chờ duyệt" 
  *     tags: [Auth]
  *     responses:
  *       200:
- *         description: Lấy danh sách đối tác chờ duyệt thành công
+ *         description: "Lấy danh sách đối tác chờ duyệt thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getPendingPartners = async (req, res) => {
   try {

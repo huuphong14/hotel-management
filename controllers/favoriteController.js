@@ -7,7 +7,7 @@ const Hotel = require("../models/Hotel");
  * @swagger
  * /api/favorites:
  *   post:
- *     summary: Thêm khách sạn vào danh sách yêu thích
+ *     summary: "Thêm khách sạn vào danh sách yêu thích"
  *     tags: [Favorite]
  *     security:
  *       - bearerAuth: []
@@ -22,16 +22,16 @@ const Hotel = require("../models/Hotel");
  *             properties:
  *               hotelId:
  *                 type: string
- *                 description: ID khách sạn
+ *                 description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Đã thêm khách sạn vào danh sách yêu thích
+ *         description: "Đã thêm khách sạn vào danh sách yêu thích"
  *       400:
- *         description: Khách sạn đã có trong danh sách yêu thích
+ *         description: "Khách sạn đã có trong danh sách yêu thích"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.addFavorite = async (req, res) => {
   try {
@@ -85,7 +85,7 @@ exports.addFavorite = async (req, res) => {
  * @swagger
  * /api/favorites/{hotelId}:
  *   delete:
- *     summary: Xóa khách sạn khỏi danh sách yêu thích
+ *     summary: "Xóa khách sạn khỏi danh sách yêu thích"
  *     tags: [Favorite]
  *     security:
  *       - bearerAuth: []
@@ -95,14 +95,14 @@ exports.addFavorite = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Đã xóa khách sạn khỏi danh sách yêu thích
+ *         description: "Đã xóa khách sạn khỏi danh sách yêu thích"
  *       400:
- *         description: Khách sạn không có trong danh sách yêu thích
+ *         description: "Khách sạn không có trong danh sách yêu thích"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.removeFavorite = async (req, res) => {
   try {
@@ -152,15 +152,15 @@ exports.removeFavorite = async (req, res) => {
  * @swagger
  * /api/favorites:
  *   get:
- *     summary: Lấy danh sách khách sạn yêu thích của người dùng
+ *     summary: "Lấy danh sách khách sạn yêu thích của người dùng"
  *     tags: [Favorite]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn yêu thích thành công
+ *         description: "Lấy danh sách khách sạn yêu thích thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getFavorites = async (req, res) => {
   try {
@@ -190,7 +190,7 @@ exports.getFavorites = async (req, res) => {
  * @swagger
  * /api/favorites/check/{hotelId}:
  *   get:
- *     summary: Kiểm tra một khách sạn có trong danh sách yêu thích không
+ *     summary: "Kiểm tra một khách sạn có trong danh sách yêu thích không"
  *     tags: [Favorite]
  *     security:
  *       - bearerAuth: []
@@ -200,12 +200,12 @@ exports.getFavorites = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Kết quả kiểm tra yêu thích
+ *         description: "Kết quả kiểm tra yêu thích"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.checkFavorite = async (req, res) => {
   try {
@@ -233,24 +233,24 @@ exports.checkFavorite = async (req, res) => {
  * @swagger
  * /api/favorites/popular:
  *   get:
- *     summary: Lấy danh sách khách sạn được yêu thích nhiều nhất
+ *     summary: "Lấy danh sách khách sạn được yêu thích nhiều nhất" 
  *     tags: [Favorite]
  *     parameters:
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn phổ biến thành công
+ *         description: "Lấy danh sách khách sạn phổ biến thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getPopularHotels = async (req, res) => {
   try {

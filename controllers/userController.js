@@ -11,15 +11,15 @@ const cloudinaryService = require("../config/cloudinaryService");
  * @swagger
  * /api/users/me:
  *   get:
- *     summary: Lấy thông tin người dùng hiện tại
+ *     summary: "Lấy thông tin người dùng hiện tại"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thông tin thành công
+ *         description: "Lấy thông tin thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id);
@@ -34,7 +34,7 @@ exports.getMe = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/me:
  *   put:
- *     summary: Cập nhật thông tin người dùng
+ *     summary: "Cập nhật thông tin người dùng"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -57,9 +57,9 @@ exports.getMe = asyncHandler(async (req, res) => {
  *                 type: object
  *     responses:
  *       200:
- *         description: Cập nhật thành công
+ *         description: "Cập nhật thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateMe = asyncHandler(async (req, res) => {
   // Lọc các trường được phép cập nhật
@@ -127,7 +127,7 @@ exports.updateMe = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/me/avatar:
  *   patch:
- *     summary: Upload avatar
+ *     summary: "Upload avatar"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -143,11 +143,11 @@ exports.updateMe = asyncHandler(async (req, res) => {
  *                 format: binary
  *     responses:
  *       200:
- *         description: Upload avatar thành công
+ *         description: "Upload avatar thành công"
  *       400:
- *         description: Vui lòng tải lên một ảnh
+ *         description: "Vui lòng tải lên một ảnh"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -202,7 +202,7 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/me/change-password:
  *   patch:
- *     summary: Đổi mật khẩu
+ *     summary: "Đổi mật khẩu"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -227,15 +227,15 @@ exports.uploadAvatar = asyncHandler(async (req, res) => {
  *                 type: boolean
  *     responses:
  *       200:
- *         description: Đổi mật khẩu thành công
+ *         description: "Đổi mật khẩu thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: "Dữ liệu không hợp lệ"
  *       401:
- *         description: Mật khẩu hiện tại không đúng
+ *         description: "Mật khẩu hiện tại không đúng"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.changePassword = asyncHandler(async (req, res) => {
   const { currentPassword, newPassword, confirmPassword, logoutAllDevices } =
@@ -316,7 +316,7 @@ exports.changePassword = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/me/deactivate:
  *   patch:
- *     summary: Vô hiệu hóa tài khoản (soft delete)
+ *     summary: "Vô hiệu hóa tài khoản (soft delete)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -335,13 +335,13 @@ exports.changePassword = asyncHandler(async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Vô hiệu hóa tài khoản thành công
+ *         description: "Vô hiệu hóa tài khoản thành công"
  *       400:
- *         description: Không thể vô hiệu hóa tài khoản
+ *         description: "Không thể vô hiệu hóa tài khoản"
  *       401:
- *         description: Mật khẩu không đúng
+ *         description: "Mật khẩu không đúng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deactivateAccount = asyncHandler(async (req, res) => {
   // Kiểm tra mật khẩu
@@ -429,7 +429,7 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/me/notifications:
  *   put:
- *     summary: Cập nhật thiết lập thông báo
+ *     summary: "Cập nhật thiết lập thông báo"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -448,9 +448,9 @@ exports.deactivateAccount = asyncHandler(async (req, res) => {
  *                 type: boolean
  *     responses:
  *       200:
- *         description: Cập nhật thiết lập thông báo thành công
+ *         description: "Cập nhật thiết lập thông báo thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateNotificationSettings = asyncHandler(async (req, res) => {
   const { email, promotions, bookingUpdates } = req.body;
@@ -482,7 +482,7 @@ exports.updateNotificationSettings = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users:
  *   get:
- *     summary: Lấy danh sách tất cả người dùng (admin only)
+ *     summary: "Lấy danh sách tất cả người dùng (admin only)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -491,42 +491,42 @@ exports.updateNotificationSettings = asyncHandler(async (req, res) => {
  *         name: search
  *         schema:
  *           type: string
- *         description: Tìm kiếm theo tên hoặc email
+ *         description: "Tìm kiếm theo tên hoặc email"
  *       - in: query
  *         name: role
  *         schema:
  *           type: string
- *         description: Lọc theo vai trò
+ *         description: "Lọc theo vai trò"
  *       - in: query
  *         name: isEmailVerified
  *         schema:
  *           type: boolean
- *         description: Lọc theo trạng thái xác thực email
+ *         description: "Lọc theo trạng thái xác thực email"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *       - in: query
  *         name: sortBy
  *         schema:
  *           type: string
- *         description: Sắp xếp theo trường
+ *         description: "Sắp xếp theo trường"
  *       - in: query
  *         name: sortOrder
  *         schema:
  *           type: string
- *         description: Thứ tự sắp xếp (asc|desc)
+ *         description: "Thứ tự sắp xếp (asc|desc)"
  *     responses:
  *       200:
- *         description: Lấy danh sách người dùng thành công
+ *         description: "Lấy danh sách người dùng thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getUsers = asyncHandler(async (req, res) => {
   // Tìm kiếm và lọc
@@ -597,7 +597,7 @@ exports.getUsers = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   get:
- *     summary: Lấy thông tin một người dùng (admin only)
+ *     summary: "Lấy thông tin một người dùng (admin only)" 
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -607,14 +607,14 @@ exports.getUsers = asyncHandler(async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID người dùng
+ *         description: "ID người dùng"
  *     responses:
  *       200:
- *         description: Lấy thông tin người dùng thành công
+ *         description: "Lấy thông tin người dùng thành công"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id).select(
@@ -638,7 +638,7 @@ exports.getUser = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   put:
- *     summary: Cập nhật thông tin người dùng (admin only)
+ *     summary: "Cập nhật thông tin người dùng (admin only)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -648,7 +648,7 @@ exports.getUser = asyncHandler(async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID người dùng
+ *         description: "ID người dùng"
  *     requestBody:
  *       required: true
  *       content:
@@ -670,11 +670,11 @@ exports.getUser = asyncHandler(async (req, res) => {
  *                 type: object
  *     responses:
  *       200:
- *         description: Cập nhật người dùng thành công
+ *         description: "Cập nhật người dùng thành công"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateUser = asyncHandler(async (req, res) => {
   // Lọc các trường được phép cập nhật
@@ -723,7 +723,7 @@ exports.updateUser = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/{id}:
  *   delete:
- *     summary: Xóa người dùng (admin only)
+ *     summary: "Xóa người dùng (admin only)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -733,16 +733,16 @@ exports.updateUser = asyncHandler(async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID người dùng
+ *         description: "ID người dùng"
  *     responses:
  *       200:
- *         description: Xóa người dùng thành công
+ *         description: "Xóa người dùng thành công"
  *       400:
- *         description: Không thể xóa admin cuối cùng hoặc người dùng còn khách sạn/booking
+ *         description: "Không thể xóa admin cuối cùng hoặc người dùng còn khách sạn/booking"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
@@ -816,7 +816,7 @@ exports.deleteUser = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/{id}/deactivate:
  *   patch:
- *     summary: Vô hiệu hóa tài khoản người dùng bởi Admin
+ *     summary: "Vô hiệu hóa tài khoản người dùng bởi Admin"  
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -826,7 +826,7 @@ exports.deleteUser = asyncHandler(async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID người dùng
+ *         description: "ID người dùng" 
  *     requestBody:
  *       required: true
  *       content:
@@ -840,13 +840,13 @@ exports.deleteUser = asyncHandler(async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: Vô hiệu hóa tài khoản thành công
+ *         description: "Vô hiệu hóa tài khoản thành công"
  *       400:
- *         description: Không thể vô hiệu hóa admin cuối cùng hoặc người dùng còn khách sạn/booking
+ *         description: "Không thể vô hiệu hóa admin cuối cùng hoặc người dùng còn khách sạn/booking"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deactivateUserByAdmin = asyncHandler(async (req, res) => {
   const { reason } = req.body;
@@ -950,7 +950,7 @@ exports.deactivateUserByAdmin = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/{id}/activate:
  *   patch:
- *     summary: Kích hoạt lại tài khoản người dùng (admin only)
+ *     summary: "Kích hoạt lại tài khoản người dùng (admin only)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
@@ -960,16 +960,16 @@ exports.deactivateUserByAdmin = asyncHandler(async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID người dùng
+ *         description: "ID người dùng"
  *     responses:
  *       200:
- *         description: Kích hoạt lại tài khoản thành công
+ *         description: "Kích hoạt lại tài khoản thành công"
  *       400:
- *         description: Tài khoản đã được kích hoạt hoặc không thể kích hoạt
+ *         description: "Tài khoản đã được kích hoạt hoặc không thể kích hoạt"
  *       404:
- *         description: Không tìm thấy người dùng
+ *         description: "Không tìm thấy người dùng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.activateUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
@@ -1021,15 +1021,15 @@ exports.activateUser = asyncHandler(async (req, res) => {
  * @swagger
  * /api/users/stats:
  *   get:
- *     summary: Lấy thống kê người dùng (admin only)
+ *     summary: "Lấy thống kê người dùng (admin only)"
  *     tags: [User]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thống kê người dùng thành công
+ *         description: "Lấy thống kê người dùng thành công"  
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getUserStatus = asyncHandler(async (req, res) => {
   // Thống kê theo role

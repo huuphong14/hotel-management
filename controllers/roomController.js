@@ -12,7 +12,7 @@ const mongoose = require("mongoose");
  * @swagger
  * /api/hotels/{hotelId}/rooms:
  *   post:
- *     summary: Tạo phòng mới cho khách sạn
+ *     summary: "Tạo phòng mới cho khách sạn"
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -22,7 +22,7 @@ const mongoose = require("mongoose");
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"  
  *     requestBody:
  *       required: true
  *       content:
@@ -42,7 +42,7 @@ const mongoose = require("mongoose");
  *                 type: number
  *               amenities:
  *                 type: string
- *                 description: JSON array các ID tiện ích
+ *                 description: "JSON array các ID tiện ích"
  *               images:
  *                 type: array
  *                 items:
@@ -50,15 +50,15 @@ const mongoose = require("mongoose");
  *                   format: binary
  *     responses:
  *       201:
- *         description: Tạo phòng thành công
+ *         description: "Tạo phòng thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: "Dữ liệu không hợp lệ"
  *       403:
- *         description: Không có quyền thêm phòng
+ *         description: "Không có quyền thêm phòng"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createRoom = async (req, res) => {
   try {
@@ -119,7 +119,7 @@ exports.createRoom = async (req, res) => {
  * @swagger
  * /api/rooms/{id}:
  *   get:
- *     summary: Lấy thông tin chi tiết một phòng
+ *     summary: "Lấy thông tin chi tiết một phòng"
  *     tags: [Room]
  *     parameters:
  *       - in: path
@@ -127,14 +127,14 @@ exports.createRoom = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID phòng
+ *         description: "ID phòng"
  *     responses:
  *       200:
- *         description: Lấy thông tin phòng thành công
+ *         description: "Lấy thông tin phòng thành công"
  *       404:
- *         description: Không tìm thấy phòng
+ *         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getRoom = async (req, res) => {
   try {
@@ -176,7 +176,7 @@ exports.getRoom = async (req, res) => {
  * @swagger
  * /api/hotels/{hotelId}/rooms:
  *   get:
- *     summary: Lấy danh sách phòng của khách sạn
+ *     summary: "Lấy danh sách phòng của khách sạn"
  *     tags: [Room]
  *     parameters:
  *       - in: path
@@ -184,47 +184,47 @@ exports.getRoom = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
- *         description: Giá tối thiểu
+ *         description: "Giá tối thiểu"
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *         description: Giá tối đa
+ *         description: "Giá tối đa"
  *       - in: query
  *         name: capacity
  *         schema:
  *           type: number
- *         description: Sức chứa
+ *         description: "Sức chứa"
  *       - in: query
  *         name: available
  *         schema:
  *           type: string
- *         description: Lọc phòng còn trống
+ *         description: "Lọc phòng còn trống"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"    
  *     responses:
  *       200:
- *         description: Lấy danh sách phòng thành công
+ *         description: "Lấy danh sách phòng thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getRooms = async (req, res) => {
   try {
@@ -295,7 +295,7 @@ exports.getRooms = async (req, res) => {
  * @swagger
  * /api/rooms/{id}:
  *   put:
- *     summary: Cập nhật thông tin phòng
+ *     summary: "Cập nhật thông tin phòng"
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -305,7 +305,7 @@ exports.getRooms = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID phòng
+ *         description: "ID phòng"
  *     requestBody:
  *       required: true
  *       content:
@@ -321,7 +321,7 @@ exports.getRooms = async (req, res) => {
  *                 type: number
  *               amenities:
  *                 type: string
- *                 description: JSON array các ID tiện ích
+ *                 description: "JSON array các ID tiện ích"
  *               images:
  *                 type: array
  *                 items:
@@ -330,27 +330,27 @@ exports.getRooms = async (req, res) => {
  *               imageAction:
  *                 type: string
  *                 enum: [add, replace]
- *                 description: Thao tác với ảnh
+ *                 description: "Thao tác với ảnh"
  *               removeImages:
  *                 type: string
  *                 enum: ['true']
- *                 description: Xóa toàn bộ ảnh
+ *                 description: "Xóa toàn bộ ảnh"
  *               removeImageIds:
  *                 type: string
- *                 description: Danh sách ID ảnh cần xóa (dạng JSON hoặc chuỗi cách nhau bởi dấu phẩy)
+ *                 description: "Danh sách ID ảnh cần xóa (dạng JSON hoặc chuỗi cách nhau bởi dấu phẩy)"
  *               removeDiscount:
  *                 type: string
  *                 enum: ['true']
- *                 description: Hủy giảm giá phòng
+ *                 description: "Hủy giảm giá phòng"
  *     responses:
  *       200:
- *         description: Cập nhật phòng thành công
+ *         description: "Cập nhật phòng thành công"
  *       403:
- *         description: Không có quyền cập nhật phòng
+ *         description: "Không có quyền cập nhật phòng"
  *       404:
- *         description: Không tìm thấy phòng
+*         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateRoom = async (req, res) => {
   try {
@@ -560,7 +560,7 @@ exports.updateRoom = async (req, res) => {
  * @swagger
  * /api/rooms/{id}:
  *   delete:
- *     summary: Xóa phòng
+ *     summary: "Xóa phòng" 
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -570,18 +570,18 @@ exports.updateRoom = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID phòng
+ *         description: "ID phòng"
  *     responses:
  *       200:
- *         description: Xóa phòng thành công
+ *         description: "Xóa phòng thành công"
  *       400:
- *         description: Không thể xóa phòng đang có đơn đặt phòng
+ *         description: "Không thể xóa phòng đang có đơn đặt phòng"
  *       403:
- *         description: Không có quyền xóa phòng
+ *         description: "Không có quyền xóa phòng"
  *       404:
- *         description: Không tìm thấy phòng
+ *         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteRoom = async (req, res) => {
   try {
@@ -649,7 +649,7 @@ exports.deleteRoom = async (req, res) => {
  * @swagger
  * /api/rooms/{id}/discount:
  *   put:
- *     summary: Cài đặt giảm giá cho phòng
+ *     summary: "Cài đặt giảm giá cho phòng"
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -659,7 +659,7 @@ exports.deleteRoom = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID phòng
+ *         description: "ID phòng"  
  *     requestBody:
  *       required: true
  *       content:
@@ -681,15 +681,15 @@ exports.deleteRoom = async (req, res) => {
  *                 format: date
  *     responses:
  *       200:
- *         description: Cài đặt giảm giá thành công
+ *         description: "Cài đặt giảm giá thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: "Dữ liệu không hợp lệ"
  *       403:
- *         description: Không có quyền cài đặt giảm giá
+ *         description: "Không có quyền cài đặt giảm giá"
  *       404:
- *         description: Không tìm thấy phòng
+ *         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.setRoomDiscount = async (req, res) => {
   try {
@@ -760,7 +760,7 @@ exports.setRoomDiscount = async (req, res) => {
  * @swagger
  * /api/rooms/{id}/discount:
  *   delete:
- *     summary: Hủy giảm giá phòng
+ *     summary: "Hủy giảm giá phòng"
  *     tags: [Room]
  *     security:
  *       - bearerAuth: []
@@ -770,16 +770,16 @@ exports.setRoomDiscount = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID phòng
+ *         description: "ID phòng"
  *     responses:
  *       200:
- *         description: Hủy giảm giá thành công
+ *         description: "Hủy giảm giá thành công"
  *       403:
- *         description: Không có quyền hủy giảm giá
+ *         description: "Không có quyền hủy giảm giá"
  *       404:
- *         description: Không tìm thấy phòng
+ *         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.removeRoomDiscount = async (req, res) => {
   try {

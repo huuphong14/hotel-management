@@ -6,7 +6,7 @@ const NotificationService = require("../services/notificationService");
  * @swagger
  * /api/vouchers:
  *   post:
- *     summary: Tạo voucher mới
+ *     summary: "Tạo voucher mới"
  *     tags: [Voucher]
  *     security:
  *       - bearerAuth: []
@@ -54,11 +54,11 @@ const NotificationService = require("../services/notificationService");
  *                 example: 200000
  *     responses:
  *       201:
- *         description: Tạo voucher thành công
+ *         description: "Tạo voucher thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ hoặc mã đã tồn tại
+ *         description: "Dữ liệu không hợp lệ hoặc mã đã tồn tại"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createVoucher = async (req, res) => {
   try {
@@ -193,7 +193,7 @@ exports.createVoucher = async (req, res) => {
  * @swagger
  * /api/vouchers:
  *   get:
- *     summary: Lấy danh sách voucher
+ *     summary: "Lấy danh sách voucher"
  *     tags: [Voucher]
  *     security:
  *       - bearerAuth: []
@@ -202,17 +202,17 @@ exports.createVoucher = async (req, res) => {
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang hiện tại
+ *         description: "Trang hiện tại"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách voucher thành công
+ *         description: "Lấy danh sách voucher thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getVouchers = async (req, res) => {
   try {
@@ -253,7 +253,7 @@ exports.getVouchers = async (req, res) => {
  * @swagger
  * /api/vouchers/{id}:
  *   put:
- *     summary: Cập nhật voucher
+ *     summary: "Cập nhật voucher"
  *     tags: [Voucher]
  *     security:
  *       - bearerAuth: []
@@ -263,7 +263,7 @@ exports.getVouchers = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID của voucher
+ *         description: "ID của voucher"
  *     requestBody:
  *       required: true
  *       content:
@@ -292,13 +292,13 @@ exports.getVouchers = async (req, res) => {
  *                 type: number
  *     responses:
  *       200:
- *         description: Cập nhật voucher thành công
+ *         description: "Cập nhật voucher thành công"
  *       404:
- *         description: Không tìm thấy voucher
+ *         description: "Không tìm thấy voucher"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: "Dữ liệu không hợp lệ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateVoucher = async (req, res) => {
   try {
@@ -416,7 +416,7 @@ exports.updateVoucher = async (req, res) => {
  * @swagger
  * /api/vouchers/available:
  *   get:
- *     summary: Lấy danh sách voucher có thể sử dụng
+ *     summary: "Lấy danh sách voucher có thể sử dụng"
  *     tags: [Voucher]
  *     security:
  *       - bearerAuth: []
@@ -425,24 +425,24 @@ exports.updateVoucher = async (req, res) => {
  *         name: totalAmount
  *         schema:
  *           type: number
- *         description: Giá trị đơn hàng để lọc voucher phù hợp
+ *         description: "Giá trị đơn hàng để lọc voucher phù hợp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang hiện tại
+ *         description: "Trang hiện tại"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách voucher có thể sử dụng thành công
+ *         description: "Lấy danh sách voucher có thể sử dụng thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: "Dữ liệu không hợp lệ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getAvailableVouchers = async (req, res) => {
   try {

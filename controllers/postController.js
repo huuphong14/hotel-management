@@ -6,7 +6,7 @@ const cloudinaryService = require("../config/cloudinaryService");
  * @swagger
  * /api/posts:
  *   post:
- *     summary: Tạo bài viết mới
+ *     summary: "Tạo bài viết mới"
  *     tags: [Post]
  *     security:
  *       - bearerAuth: []
@@ -31,9 +31,9 @@ const cloudinaryService = require("../config/cloudinaryService");
  *                   format: binary
  *     responses:
  *       201:
- *         description: Tạo bài viết thành công
+ *         description: "Tạo bài viết thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createPost = async (req, res) => {
   try {
@@ -68,13 +68,13 @@ exports.createPost = async (req, res) => {
  * @swagger
  * /api/posts:
  *   get:
- *     summary: Lấy danh sách bài viết
+ *     summary: "Lấy danh sách bài viết"
  *     tags: [Post]
  *     responses:
  *       200:
- *         description: Lấy danh sách bài viết thành công
+ *         description: "Lấy danh sách bài viết thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getPosts = async (req, res) => {
   try {
@@ -99,7 +99,7 @@ exports.getPosts = async (req, res) => {
  * @swagger
  * /api/posts/{id}:
  *   get:
- *     summary: Lấy chi tiết bài viết
+ *     summary: "Lấy chi tiết bài viết"
  *     tags: [Post]
  *     parameters:
  *       - in: path
@@ -110,11 +110,11 @@ exports.getPosts = async (req, res) => {
  *         description: ID bài viết
  *     responses:
  *       200:
- *         description: Lấy chi tiết bài viết thành công
+ *         description: "Lấy chi tiết bài viết thành công"
  *       404:
- *         description: Không tìm thấy bài viết
+ *         description: "Không tìm thấy bài viết"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getPost = async (req, res) => {
   try {
@@ -146,7 +146,7 @@ exports.getPost = async (req, res) => {
  * @swagger
  * /api/posts/{id}:
  *   put:
- *     summary: Cập nhật bài viết
+ *     summary: "Cập nhật bài viết"
  *     tags: [Post]
  *     security:
  *       - bearerAuth: []
@@ -176,23 +176,23 @@ exports.getPost = async (req, res) => {
  *               imageAction:
  *                 type: string
  *                 enum: [add, replace]
- *                 description: Thao tác với ảnh
+ *                 description: "Thao tác với ảnh"
  *               removeImages:
  *                 type: string
  *                 enum: ['true']
- *                 description: Xóa toàn bộ ảnh
+ *                 description: "Xóa toàn bộ ảnh"
  *               removeImageIds:
  *                 type: string
- *                 description: Danh sách ID ảnh cần xóa (dạng JSON hoặc chuỗi cách nhau bởi dấu phẩy)
+ *                 description: "Danh sách ID ảnh cần xóa (dạng JSON hoặc chuỗi cách nhau bởi dấu phẩy)"
  *     responses:
  *       200:
- *         description: Cập nhật bài viết thành công
+ *         description: "Cập nhật bài viết thành công"
  *       403:
- *         description: Không có quyền cập nhật bài viết
+ *         description: "Không có quyền cập nhật bài viết"
  *       404:
- *         description: Không tìm thấy bài viết
+ *         description: "Không tìm thấy bài viết"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updatePost = async (req, res) => {
   try {
@@ -333,7 +333,7 @@ exports.updatePost = async (req, res) => {
  * @swagger
  * /api/posts/{id}:
  *   delete:
- *     summary: Xóa bài viết
+ *     summary: "Xóa bài viết"
  *     tags: [Post]
  *     security:
  *       - bearerAuth: []
@@ -346,13 +346,13 @@ exports.updatePost = async (req, res) => {
  *         description: ID bài viết
  *     responses:
  *       200:
- *         description: Xóa bài viết thành công
+ *         description: "Xóa bài viết thành công"
  *       403:
- *         description: Không có quyền xóa bài viết
+ *         description: "Không có quyền xóa bài viết"
  *       404:
- *         description: Không tìm thấy bài viết
+ *         description: "Không tìm thấy bài viết"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deletePost = async (req, res) => {
   try {
@@ -408,7 +408,7 @@ exports.deletePost = async (req, res) => {
  * @swagger
  * /api/posts/{id}/interactions:
  *   post:
- *     summary: Thêm tương tác cho bài viết
+ *     summary: "Thêm tương tác cho bài viết"
  *     tags: [Post]
  *     security:
  *       - bearerAuth: []
@@ -418,7 +418,7 @@ exports.deletePost = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID bài viết
+ *         description: "ID bài viết"
  *     requestBody:
  *       required: true
  *       content:
@@ -428,17 +428,17 @@ exports.deletePost = async (req, res) => {
  *             properties:
  *               type:
  *                 type: string
- *                 description: Loại tương tác (like, comment, ...)
+ *                 description: "Loại tương tác (like, comment, ...)"
  *               content:
  *                 type: string
- *                 description: Nội dung bình luận (nếu có)
+ *                 description: "Nội dung bình luận (nếu có)"
  *     responses:
  *       201:
- *         description: Thêm tương tác thành công
+ *         description: "Thêm tương tác thành công"
  *       404:
- *         description: Không tìm thấy bài viết
+ *         description: "Không tìm thấy bài viết"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.addInteraction = async (req, res) => {
   try {
@@ -471,7 +471,7 @@ exports.addInteraction = async (req, res) => {
  * @swagger
  * /api/posts/{id}/interactions:
  *   get:
- *     summary: Lấy danh sách tương tác của bài viết
+ *     summary: "Lấy danh sách tương tác của bài viết"
  *     tags: [Post]
  *     parameters:
  *       - in: path
@@ -479,12 +479,12 @@ exports.addInteraction = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID bài viết
+ *         description: "ID bài viết"
  *     responses:
  *       200:
- *         description: Lấy danh sách tương tác thành công
+ *         description: "Lấy danh sách tương tác thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getPostInteractions = async (req, res) => {
   try {
@@ -509,7 +509,7 @@ exports.getPostInteractions = async (req, res) => {
  * @swagger
  * /api/posts/{postId}/interactions/{interactionId}:
  *   delete:
- *     summary: Xóa tương tác
+ *     summary: "Xóa tương tác"
  *     tags: [Post]
  *     security:
  *       - bearerAuth: []
@@ -519,22 +519,22 @@ exports.getPostInteractions = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID bài viết
+ *         description: "ID bài viết" 
  *       - in: path
  *         name: interactionId
  *         required: true
  *         schema:
  *           type: string
- *         description: ID tương tác
+ *         description: "ID tương tác"
  *     responses:
  *       200:
- *         description: Xóa tương tác thành công
+ *         description: "Xóa tương tác thành công"
  *       403:
- *         description: Không có quyền xóa tương tác
+ *         description: "Không có quyền xóa tương tác"
  *       404:
- *         description: Không tìm thấy tương tác
+ *         description: "Không tìm thấy tương tác"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteInteraction = async (req, res) => {
   try {
@@ -577,7 +577,7 @@ exports.deleteInteraction = async (req, res) => {
  * @swagger
  * /api/uploads/tinymce:
  *   post:
- *     summary: Upload image for TinyMCE
+ *     summary: "Upload image for TinyMCE"
  *     tags: [Post]
  *     responses:
  */

@@ -8,15 +8,15 @@ const Room = require("../models/Room");
  * @swagger
  * /api/admin-statistics/system-overview:
  *   get:
- *     summary: Tổng quan hệ thống
+ *     summary: "Tổng quan hệ thống"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy tổng quan hệ thống thành công
+ *         description: "Lấy tổng quan hệ thống thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getSystemOverview = asyncHandler(async (req, res) => {
   const totalPartners = await User.countDocuments({ role: "partner" });
@@ -44,15 +44,15 @@ exports.getSystemOverview = asyncHandler(async (req, res) => {
  * @swagger
  * /api/admin-statistics/booking-status:
  *   get:
- *     summary: Thống kê booking theo trạng thái
+ *     summary: "Thống kê booking theo trạng thái"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thống kê booking thành công
+ *         description: "Lấy thống kê booking thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getBookingStatus = asyncHandler(async (req, res) => {
   const stats = await Booking.aggregate([
@@ -85,15 +85,15 @@ exports.getBookingStatus = asyncHandler(async (req, res) => {
  * @swagger
  * /api/admin-statistics/hotel-status:
  *   get:
- *     summary: Thống kê khách sạn theo trạng thái
+ *     summary: "Thống kê khách sạn theo trạng thái"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thống kê khách sạn thành công
+ *         description: "Lấy thống kê khách sạn thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getHotelStatus = asyncHandler(async (req, res) => {
   const stats = await Hotel.aggregate([
@@ -125,7 +125,7 @@ exports.getHotelStatus = asyncHandler(async (req, res) => {
  * @swagger
  * /api/admin-statistics/chart-data:
  *   get:
- *     summary: Dữ liệu biểu đồ theo thời gian
+ *     summary: "Dữ liệu biểu đồ theo thời gian"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
@@ -136,27 +136,27 @@ exports.getHotelStatus = asyncHandler(async (req, res) => {
  *           type: string
  *           format: date
  *         required: true
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
  *         required: true
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *       - in: query
  *         name: groupBy
  *         schema:
  *           type: string
  *           enum: [day, month]
- *         description: Nhóm theo ngày hoặc tháng (mặc định: day)
+ *         description: "Nhóm theo ngày hoặc tháng (mặc định: day)"
  *     responses:
  *       200:
- *         description: Lấy dữ liệu biểu đồ thành công
+ *         description: "Lấy dữ liệu biểu đồ thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getChartData = asyncHandler(async (req, res) => {
   const { from, to, groupBy = "day" } = req.query;
@@ -284,7 +284,7 @@ exports.getChartData = asyncHandler(async (req, res) => {
  * @swagger
  * /api/admin-statistics/top-hotels:
  *   get:
- *     summary: Top khách sạn có nhiều booking nhất
+ *     summary: "Top khách sạn có nhiều booking nhất"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
@@ -293,26 +293,26 @@ exports.getChartData = asyncHandler(async (req, res) => {
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng khách sạn trả về (mặc định: 5)
+ *         description: "Số lượng khách sạn trả về (mặc định: 5)"
  *       - in: query
  *         name: from
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *     responses:
  *       200:
- *         description: Lấy top khách sạn thành công
+ *         description: "Lấy top khách sạn thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getTopHotelsByBookings = asyncHandler(async (req, res) => {
   const { limit = 5, from, to } = req.query;
@@ -397,7 +397,7 @@ exports.getTopHotelsByBookings = asyncHandler(async (req, res) => {
  * @swagger
  * /api/admin-statistics/top-users:
  *   get:
- *     summary: Top người dùng có nhiều booking nhất
+ *     summary: "Top người dùng có nhiều booking nhất"
  *     tags: [AdminStatistics]
  *     security:
  *       - bearerAuth: []
@@ -406,26 +406,26 @@ exports.getTopHotelsByBookings = asyncHandler(async (req, res) => {
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng người dùng trả về (mặc định: 5)
+ *         description: "Số lượng người dùng trả về (mặc định: 5)"
  *       - in: query
  *         name: from
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *     responses:
  *       200:
- *         description: Lấy top người dùng thành công
+ *         description: "Lấy top người dùng thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getTopUsersByBookings = asyncHandler(async (req, res) => {
   const { limit = 5, from, to } = req.query;

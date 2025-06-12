@@ -9,7 +9,7 @@ const mongoose = require("mongoose");
  * @swagger
  * /api/hotels:
  *   post:
- *     summary: Tạo khách sạn mới
+ *     summary: "Tạo khách sạn mới"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -40,9 +40,9 @@ const mongoose = require("mongoose");
  *                   format: binary
  *     responses:
  *       201:
- *         description: Tạo khách sạn thành công
+ *         description: "Tạo khách sạn thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createHotel = async (req, res) => {
   try {
@@ -86,17 +86,17 @@ exports.createHotel = async (req, res) => {
  * @swagger
  * /api/hotels/my-hotels:
  *   get:
- *     summary: Lấy danh sách khách sạn của người dùng đăng nhập
+ *     summary: "Lấy danh sách khách sạn của người dùng đăng nhập"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn thành công
+ *         description: "Lấy danh sách khách sạn thành công"
  *       403:
- *         description: Chỉ đối tác mới có thể xem danh sách khách sạn của mình
+ *         description: "Chỉ đối tác mới có thể xem danh sách khách sạn của mình"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getMyHotels = async (req, res) => {
   try {
@@ -137,54 +137,54 @@ exports.getMyHotels = async (req, res) => {
  * @swagger
  * /api/hotels:
  *   get:
- *     summary: Lấy danh sách khách sạn
+ *     summary: "Lấy danh sách khách sạn"
  *     tags: [Hotel]
  *     parameters:
  *       - in: query
  *         name: name
  *         schema:
  *           type: string
- *         description: Tên khách sạn
+ *         description: "Tên khách sạn"
  *       - in: query
  *         name: locationId
  *         schema:
  *           type: string
- *         description: ID địa điểm
+ *         description: "ID địa điểm"
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
- *         description: Giá tối thiểu
+ *         description: "Giá tối thiểu"
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *         description: Giá tối đa
+ *         description: "Giá tối đa"
  *       - in: query
  *         name: minDiscountPercent
  *         schema:
  *           type: number
- *         description: Phần trăm giảm giá tối thiểu
+ *         description: "Phần trăm giảm giá tối thiểu"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn thành công
+ *         description: "Lấy danh sách khách sạn thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getHotels = async (req, res) => {
   try {
@@ -294,7 +294,7 @@ exports.getHotels = async (req, res) => {
  * @swagger
  * /api/hotels/{id}:
  *   get:
- *     summary: Lấy thông tin một khách sạn
+ *     summary: "Lấy thông tin một khách sạn"
  *     tags: [Hotel]
  *     parameters:
  *       - in: path
@@ -302,14 +302,14 @@ exports.getHotels = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Lấy thông tin khách sạn thành công
+ *         description: "Lấy thông tin khách sạn thành công"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getHotel = async (req, res) => {
   try {
@@ -341,7 +341,7 @@ exports.getHotel = async (req, res) => {
  * @swagger
  * /api/hotels/{id}:
  *   put:
- *     summary: Cập nhật thông tin khách sạn
+ *     summary: "Cập nhật thông tin khách sạn"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -351,7 +351,7 @@ exports.getHotel = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     requestBody:
  *       required: true
  *       content:
@@ -376,16 +376,16 @@ exports.getHotel = async (req, res) => {
  *               replaceAllImages:
  *                 type: string
  *                 enum: ['true', 'false']
- *                 description: Thay thế toàn bộ ảnh cũ
+ *                 description: "Thay thế toàn bộ ảnh cũ"
  *     responses:
  *       200:
- *         description: Cập nhật khách sạn thành công
+ *         description: "Cập nhật khách sạn thành công"
  *       403:
- *         description: Không có quyền cập nhật khách sạn
+ *         description: "Không có quyền cập nhật khách sạn"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateHotel = async (req, res) => {
   try {
@@ -475,7 +475,7 @@ exports.updateHotel = async (req, res) => {
  * @swagger
  * /api/hotels/location/{locationId}:
  *   get:
- *     summary: Lấy danh sách khách sạn theo địa điểm
+ *     summary: "Lấy danh sách khách sạn theo địa điểm"
  *     tags: [Hotel]
  *     parameters:
  *       - in: path
@@ -483,12 +483,12 @@ exports.updateHotel = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID địa điểm
+ *         description: "ID địa điểm"
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn thành công
+ *         description: "Lấy danh sách khách sạn thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getHotelsByLocation = async (req, res) => {
   try {
@@ -517,7 +517,7 @@ exports.getHotelsByLocation = async (req, res) => {
  * @swagger
  * /api/hotels/{id}:
  *   delete:
- *     summary: Xóa khách sạn
+ *     summary: "Xóa khách sạn"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -527,16 +527,16 @@ exports.getHotelsByLocation = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Xóa khách sạn thành công
+ *         description: "Xóa khách sạn thành công"
  *       403:
- *         description: Không có quyền xóa khách sạn
+ *         description: "Không có quyền xóa khách sạn"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteHotel = async (req, res) => {
   try {
@@ -589,7 +589,7 @@ exports.deleteHotel = async (req, res) => {
  * @swagger
  * /api/hotels/{id}/images:
  *   post:
- *     summary: Upload hình ảnh cho khách sạn
+ *     summary: "Upload hình ảnh cho khách sạn" 
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -599,7 +599,7 @@ exports.deleteHotel = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     requestBody:
  *       required: true
  *       content:
@@ -614,15 +614,15 @@ exports.deleteHotel = async (req, res) => {
  *                   format: binary
  *     responses:
  *       200:
- *         description: Upload hình ảnh thành công
+ *         description: "Upload hình ảnh thành công"
  *       400:
- *         description: Vui lòng upload ít nhất một hình ảnh
+ *         description: "Vui lòng upload ít nhất một hình ảnh"
  *       403:
- *         description: Không có quyền cập nhật khách sạn
+ *         description: "Không có quyền cập nhật khách sạn"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.uploadHotelImages = async (req, res) => {
   try {
@@ -677,7 +677,7 @@ exports.uploadHotelImages = async (req, res) => {
  * @swagger
  * /api/hotels/{id}/images/{imageIndex}:
  *   delete:
- *     summary: Xóa một ảnh từ mảng images của khách sạn
+ *     summary: "Xóa một ảnh từ mảng images của khách sạn"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -687,22 +687,22 @@ exports.uploadHotelImages = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *       - in: path
  *         name: imageIndex
  *         required: true
  *         schema:
  *           type: integer
- *         description: Vị trí ảnh trong mảng images
+ *         description: "Vị trí ảnh trong mảng images"
  *     responses:
  *       200:
- *         description: Xóa hình ảnh thành công
+ *         description: "Xóa hình ảnh thành công"
  *       403:
- *         description: Không có quyền cập nhật khách sạn
+ *         description: "Không có quyền cập nhật khách sạn"
  *       404:
- *         description: Không tìm thấy khách sạn hoặc hình ảnh
+ *         description: "Không tìm thấy khách sạn hoặc hình ảnh"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteHotelImage = async (req, res) => {
   try {
@@ -762,7 +762,7 @@ exports.deleteHotelImage = async (req, res) => {
  * @swagger
  * /api/hotels/{id}/featured-image:
  *   put:
- *     summary: Cập nhật ảnh đại diện khách sạn
+ *     summary: "Cập nhật ảnh đại diện khách sạn"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -772,7 +772,7 @@ exports.deleteHotelImage = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     requestBody:
  *       required: true
  *       content:
@@ -785,15 +785,15 @@ exports.deleteHotelImage = async (req, res) => {
  *                 format: binary
  *     responses:
  *       200:
- *         description: Cập nhật ảnh đại diện thành công
+ *         description: "Cập nhật ảnh đại diện thành công"
  *       400:
- *         description: Vui lòng upload hình ảnh
+ *         description: "Vui lòng upload hình ảnh"
  *       403:
- *         description: Không có quyền cập nhật khách sạn
+ *         description: "Không có quyền cập nhật khách sạn"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateFeaturedImage = async (req, res) => {
   try {
@@ -847,29 +847,29 @@ exports.updateFeaturedImage = async (req, res) => {
  * @swagger
  * /api/hotels/discounts:
  *   get:
- *     summary: Lấy danh sách khách sạn đang có giảm giá
+ *     summary: "Lấy danh sách khách sạn đang có giảm giá"  
  *     tags: [Hotel]
  *     parameters:
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách khách sạn giảm giá thành công
+ *         description: "Lấy danh sách khách sạn giảm giá thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getDiscountedHotels = async (req, res) => {
   try {
@@ -936,80 +936,80 @@ exports.getDiscountedHotels = async (req, res) => {
  * @swagger
  * /api/hotels/search:
  *   get:
- *     summary: Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người
+ *     summary: "Tìm kiếm khách sạn có phòng trống theo địa điểm, ngày và số người"
  *     tags: [Hotel]
  *     parameters:
  *       - in: query
  *         name: locationName
  *         schema:
  *           type: string
- *         description: Tên địa điểm
+ *         description: "Tên địa điểm"
  *       - in: query
  *         name: checkIn
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày nhận phòng
+ *         description: "Ngày nhận phòng"
  *       - in: query
  *         name: checkOut
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày trả phòng
+ *         description: "Ngày trả phòng"
  *       - in: query
  *         name: capacity
  *         schema:
  *           type: integer
- *         description: Số người
+ *         description: "Số người"
  *       - in: query
  *         name: hotelName
  *         schema:
  *           type: string
- *         description: Tên khách sạn (tùy chọn)
+ *         description: "Tên khách sạn (tùy chọn)"
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
- *         description: Giá tối thiểu
+ *         description: "Giá tối thiểu"
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *         description: Giá tối đa
+ *         description: "Giá tối đa"
  *       - in: query
  *         name: roomType
  *         schema:
  *           type: string
- *         description: Loại phòng
+ *         description: "Loại phòng"
  *       - in: query
  *         name: amenities
  *         schema:
  *           type: string
- *         description: Danh sách tiện ích (cách nhau bằng dấu phẩy)
+ *         description: "Danh sách tiện ích (cách nhau bằng dấu phẩy)"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Tìm kiếm khách sạn thành công
+ *         description: "Tìm kiếm khách sạn thành công"
  *       400:
- *         description: Thiếu hoặc sai tham số
+ *         description: "Thiếu hoặc sai tham số"
  *       404:
- *         description: Không tìm thấy khách sạn hoặc địa điểm
+ *         description: "Không tìm thấy khách sạn hoặc địa điểm"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.searchHotelsWithAvailableRooms = async (req, res) => {
   try {
@@ -1033,7 +1033,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     if (!locationName || !checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người",
+        message:
+          "Vui lòng cung cấp địa điểm, ngày nhận phòng, ngày trả phòng và số người",
       });
     }
 
@@ -1060,13 +1061,23 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     // Validate room types if provided
     let roomTypesArray = [];
     if (roomTypes) {
-      roomTypesArray = roomTypes.split(',').map(type => type.trim());
-      const validRoomTypes = ['Standard', 'Superior', 'Deluxe', 'Suite', 'Family'];
-      const invalidTypes = roomTypesArray.filter(type => !validRoomTypes.includes(type));
+      roomTypesArray = roomTypes.split(",").map((type) => type.trim());
+      const validRoomTypes = [
+        "Standard",
+        "Superior",
+        "Deluxe",
+        "Suite",
+        "Family",
+      ];
+      const invalidTypes = roomTypesArray.filter(
+        (type) => !validRoomTypes.includes(type)
+      );
       if (invalidTypes.length > 0) {
         return res.status(400).json({
           success: false,
-          message: `Loại phòng không hợp lệ: ${invalidTypes.join(', ')}. Các loại phòng hợp lệ: ${validRoomTypes.join(', ')}`,
+          message: `Loại phòng không hợp lệ: ${invalidTypes.join(
+            ", "
+          )}. Các loại phòng hợp lệ: ${validRoomTypes.join(", ")}`,
         });
       }
     }
@@ -1123,7 +1134,9 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         locationId: location._id,
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
-        amenities: amenities ? amenities.split(',').map(id => id.trim()) : undefined
+        amenities: amenities
+          ? amenities.split(",").map((id) => id.trim())
+          : undefined,
       }
     );
 
@@ -1132,13 +1145,15 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       roomQuery,
       checkInDate,
       checkOutDate,
-      { 
-        minPrice, 
+      {
+        minPrice,
         maxPrice,
         locationId: location._id,
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
-        amenities: amenities ? amenities.split(',').map(id => id.trim()) : undefined
+        amenities: amenities
+          ? amenities.split(",").map((id) => id.trim())
+          : undefined,
       }
     );
 
@@ -1169,7 +1184,7 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  * @swagger
  * /api/hotels/{hotelId}/rooms/available:
  *   get:
- *     summary: Lấy danh sách phòng còn trống trong một khách sạn
+ *     summary: "Lấy danh sách phòng còn trống trong một khách sạn"
  *     tags: [Hotel]
  *     parameters:
  *       - in: path
@@ -1177,68 +1192,68 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *       - in: query
  *         name: checkIn
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày nhận phòng
+ *         description: "Ngày nhận phòng"
  *       - in: query
  *         name: checkOut
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày trả phòng
+ *         description: "Ngày trả phòng"
  *       - in: query
  *         name: capacity
  *         schema:
  *           type: integer
- *         description: Số người
+ *         description: "Số người"
  *       - in: query
  *         name: minPrice
  *         schema:
  *           type: number
- *         description: Giá tối thiểu
+ *         description: "Giá tối thiểu"
  *       - in: query
  *         name: maxPrice
  *         schema:
  *           type: number
- *         description: Giá tối đa
+ *         description: "Giá tối đa"
  *       - in: query
  *         name: roomType
  *         schema:
  *           type: string
- *         description: Loại phòng
+ *         description: "Loại phòng"
  *       - in: query
  *         name: amenities
  *         schema:
  *           type: string
- *         description: Danh sách tiện ích (cách nhau bằng dấu phẩy)
+ *         description: "Danh sách tiện ích (cách nhau bằng dấu phẩy)"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách phòng còn trống thành công
+ *         description: "Lấy danh sách phòng còn trống thành công"
  *       400:
- *         description: Thiếu hoặc sai tham số
+ *         description: "Thiếu hoặc sai tham số"
  *       404:
- *         description: Không tìm thấy khách sạn hoặc phòng
+ *         description: "Không tìm thấy khách sạn hoặc phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getAvailableRoomsByHotel = async (req, res) => {
   try {
@@ -1260,7 +1275,8 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
     if (!checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
-        message: "Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người",
+        message:
+          "Vui lòng cung cấp ngày nhận phòng, ngày trả phòng và số người",
       });
     }
 
@@ -1280,7 +1296,7 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
     }
 
     // Validate hotel exists and is active
-    const hotel = await Hotel.findOne({ _id: hotelId, status: 'active' });
+    const hotel = await Hotel.findOne({ _id: hotelId, status: "active" });
     if (!hotel) {
       return res.status(404).json({
         success: false,
@@ -1325,7 +1341,7 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         currentPage: Number(page),
         totalPages: Math.ceil(total / Number(limit)),
       },
-      data: rooms.map(room => ({
+      data: rooms.map((room) => ({
         _id: room._id,
         name: room.name,
         description: room.description,
@@ -1339,8 +1355,8 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
         squareMeters: room.squareMeters,
         amenities: room.amenities,
         images: room.images,
-        status: room.status
-      }))
+        status: room.status,
+      })),
     });
   } catch (error) {
     console.error("Get available rooms error:", {

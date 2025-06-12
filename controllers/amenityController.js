@@ -4,7 +4,7 @@ const Amenity = require("../models/Amenity");
  * @swagger
  * /api/amenities:
  *   post:
- *     summary: Tạo tiện ích mới
+ *     summary: "Tạo tiện ích mới"
  *     tags: [Amenity]
  *     security:
  *       - bearerAuth: []
@@ -19,17 +19,17 @@ const Amenity = require("../models/Amenity");
  *             properties:
  *               name:
  *                 type: string
- *                 description: Tên tiện ích
+ *                 description: "Tên tiện ích"
  *               icon:
  *                 type: string
- *                 description: Icon tiện ích (nếu có)
+ *                 description: "Icon tiện ích (nếu có)"
  *     responses:
  *       201:
- *         description: Tạo tiện ích thành công
+ *         description: "Tạo tiện ích thành công"
  *       403:
- *         description: Chỉ admin mới có quyền
+ *         description: "Chỉ admin mới có quyền"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createAmenity = async (req, res) => {
   try {
@@ -59,13 +59,13 @@ exports.createAmenity = async (req, res) => {
  * @swagger
  * /api/amenities:
  *   get:
- *     summary: Lấy danh sách tiện ích
+ *     summary: "Lấy danh sách tiện ích"
  *     tags: [Amenity]
  *     responses:
  *       200:
- *         description: Lấy danh sách tiện ích thành công
+ *         description: "Lấy danh sách tiện ích thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getAmenities = async (req, res) => {
   try {
@@ -89,7 +89,7 @@ exports.getAmenities = async (req, res) => {
  * @swagger
  * /api/amenities/{id}:
  *   get:
- *     summary: Lấy thông tin một tiện ích
+ *     summary: "Lấy thông tin một tiện ích"
  *     tags: [Amenity]
  *     parameters:
  *       - in: path
@@ -97,14 +97,14 @@ exports.getAmenities = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID tiện ích
+ *         description: "ID tiện ích"
  *     responses:
  *       200:
- *         description: Lấy thông tin tiện ích thành công
+ *         description: "Lấy thông tin tiện ích thành công"
  *       404:
- *         description: Không tìm thấy tiện ích
+ *         description: "Không tìm thấy tiện ích"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getAmenity = async (req, res) => {
   try {
@@ -134,7 +134,7 @@ exports.getAmenity = async (req, res) => {
  * @swagger
  * /api/amenities/{id}:
  *   put:
- *     summary: Cập nhật tiện ích
+ *     summary: "Cập nhật tiện ích"
  *     tags: [Amenity]
  *     security:
  *       - bearerAuth: []
@@ -144,7 +144,7 @@ exports.getAmenity = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID tiện ích
+ *         description: "ID tiện ích"
  *     requestBody:
  *       required: true
  *       content:
@@ -154,19 +154,19 @@ exports.getAmenity = async (req, res) => {
  *             properties:
  *               name:
  *                 type: string
- *                 description: Tên tiện ích
+ *                 description: "Tên tiện ích"
  *               icon:
  *                 type: string
- *                 description: Icon tiện ích (nếu có)
+ *                 description: "Icon tiện ích (nếu có)"
  *     responses:
  *       200:
- *         description: Cập nhật tiện ích thành công
+ *         description: "Cập nhật tiện ích thành công"
  *       403:
- *         description: Chỉ admin mới có quyền
+ *         description: "Chỉ admin mới có quyền"
  *       404:
- *         description: Không tìm thấy tiện ích
+ *         description: "Không tìm thấy tiện ích"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateAmenity = async (req, res) => {
   try {
@@ -206,7 +206,7 @@ exports.updateAmenity = async (req, res) => {
  * @swagger
  * /api/amenities/{id}:
  *   delete:
- *     summary: Xóa tiện ích
+ *     summary: "Xóa tiện ích"  
  *     tags: [Amenity]
  *     security:
  *       - bearerAuth: []
@@ -216,16 +216,16 @@ exports.updateAmenity = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID tiện ích
+ *         description: "ID tiện ích"
  *     responses:
  *       200:
- *         description: Xóa tiện ích thành công
+ *         description: "Xóa tiện ích thành công"
  *       403:
- *         description: Chỉ admin mới có quyền
+ *         description: "Chỉ admin mới có quyền"
  *       404:
- *         description: Không tìm thấy tiện ích
+ *         description: "Không tìm thấy tiện ích"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.deleteAmenity = async (req, res) => {
   try {

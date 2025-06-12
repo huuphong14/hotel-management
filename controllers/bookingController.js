@@ -14,7 +14,7 @@ const { recordRetryFailure } = require("../utils/monitoring");
  * @swagger
  * /api/bookings:
  *   post:
- *     summary: Tạo booking mới
+ *     summary: "Tạo booking mới"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -32,26 +32,26 @@ const { recordRetryFailure } = require("../utils/monitoring");
  *             properties:
  *               roomId:
  *                 type: string
- *                 description: ID phòng
+ *                 description: "ID phòng"
  *               checkIn:
  *                 type: string
  *                 format: date
- *                 description: Ngày check-in
+ *                 description: "Ngày check-in"
  *               checkOut:
  *                 type: string
  *                 format: date
- *                 description: Ngày check-out
+ *                 description: "Ngày check-out"
  *               voucherId:
  *                 type: string
- *                 description: ID voucher (nếu có)
+ *                 description: "ID voucher (nếu có)"
  *               paymentMethod:
  *                 type: string
  *                 enum: [zalopay, vnpay, credit_card, paypal]
- *                 description: Phương thức thanh toán
+ *                 description: "Phương thức thanh toán"
  *               bookingFor:
  *                 type: string
  *                 enum: [self, other]
- *                 description: Đặt cho bản thân hay người khác
+ *                 description: "Đặt cho bản thân hay người khác"
  *               contactInfo:
  *                 type: object
  *                 required:
@@ -85,13 +85,13 @@ const { recordRetryFailure } = require("../utils/monitoring");
  *                     type: string
  *     responses:
  *       201:
- *         description: Tạo booking thành công
+ *         description: "Tạo booking thành công"
  *       400:
- *         description: Dữ liệu không hợp lệ hoặc phòng không có sẵn
+ *         description: "Dữ liệu không hợp lệ hoặc phòng không có sẵn"
  *       404:
- *         description: Không tìm thấy phòng
+ *         description: "Không tìm thấy phòng"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.createBooking = async (req, res) => {
   const session = await mongoose.startSession();
@@ -482,7 +482,7 @@ function validateHotelData(room) {
  * @swagger
  * /api/bookings/retry-payment:
  *   post:
- *     summary: Thanh toán lại cho booking chưa hoàn tất
+ *     summary: "Thanh toán lại cho booking chưa hoàn tất"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -498,18 +498,18 @@ function validateHotelData(room) {
  *             properties:
  *               bookingId:
  *                 type: string
- *                 description: ID booking
+ *                 description: "ID booking"
  *               paymentMethod:
  *                 type: string
  *                 enum: [zalopay, vnpay]
- *                 description: Phương thức thanh toán
+ *                 description: "Phương thức thanh toán"
  *     responses:
  *       200:
- *         description: Tạo lại thanh toán thành công
+ *         description: "Tạo lại thanh toán thành công"
  *       400:
- *         description: Lỗi nghiệp vụ
+ *         description: "Lỗi nghiệp vụ"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.retryPayment = async (req, res) => {
   const session = await mongoose.startSession();
@@ -770,15 +770,15 @@ exports.confirmPayment = async (req, res) => {
  * @swagger
  * /api/bookings:
  *   get:
- *     summary: Lấy danh sách booking của user
+ *     summary: "Lấy danh sách booking của user"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách booking thành công
+ *         description: "Lấy danh sách booking thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getMyBookings = async (req, res) => {
   try {
@@ -802,7 +802,7 @@ exports.getMyBookings = async (req, res) => {
  * @swagger
  * /api/bookings/{id}/status:
  *   put:
- *     summary: Cập nhật trạng thái booking
+ *     summary: "Cập nhật trạng thái booking"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -812,7 +812,7 @@ exports.getMyBookings = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID booking
+ *         description: "ID booking"
  *     requestBody:
  *       required: true
  *       content:
@@ -827,13 +827,13 @@ exports.getMyBookings = async (req, res) => {
  *                 enum: [pending, confirmed, cancelled, completed]
  *     responses:
  *       200:
- *         description: Cập nhật trạng thái thành công
+ *         description: "Cập nhật trạng thái thành công"
  *       403:
- *         description: Không có quyền cập nhật
+ *         description: "Không có quyền cập nhật"
  *       404:
- *         description: Không tìm thấy booking
+ *         description: "Không tìm thấy booking"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.updateBookingStatus = async (req, res) => {
   try {
@@ -1313,7 +1313,7 @@ exports.getHotelBookings = async (req, res) => {
  * @swagger
  * /api/bookings/all:
  *   get:
- *     summary: Lấy toàn bộ booking trong hệ thống (admin)
+ *     summary: "Lấy toàn bộ booking trong hệ thống (admin)"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -1322,61 +1322,61 @@ exports.getHotelBookings = async (req, res) => {
  *         name: status
  *         schema:
  *           type: string
- *         description: Lọc theo trạng thái booking
+ *         description: "Lọc theo trạng thái booking"
  *       - in: query
  *         name: paymentStatus
  *         schema:
  *           type: string
- *         description: Lọc theo trạng thái thanh toán
+ *         description: "Lọc theo trạng thái thanh toán"
  *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *       - in: query
  *         name: hotelId
  *         schema:
  *           type: string
- *         description: Lọc theo khách sạn
+ *         description: "Lọc theo khách sạn"
  *       - in: query
  *         name: userId
  *         schema:
  *           type: string
- *         description: Lọc theo user
+ *         description: "Lọc theo user"
  *       - in: query
  *         name: paymentMethod
  *         schema:
  *           type: string
- *         description: Lọc theo phương thức thanh toán
+ *         description: "Lọc theo phương thức thanh toán"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *     responses:
  *       200:
- *         description: Lấy danh sách booking thành công
+ *         description: "Lấy danh sách booking thành công"
  *       403:
- *         description: Không có quyền truy cập
+ *         description: "Không có quyền truy cập"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getAllBookings = async (req, res) => {
   try {
@@ -1573,7 +1573,7 @@ exports.getAllBookings = async (req, res) => {
  * @swagger
  * /api/bookings/{id}:
  *   get:
- *     summary: Lấy chi tiết một booking
+ *     summary: "Lấy chi tiết một booking"
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -1583,16 +1583,16 @@ exports.getAllBookings = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID booking
+ *         description: "ID booking"
  *     responses:
  *       200:
- *         description: Lấy chi tiết booking thành công
+ *         description: "Lấy chi tiết booking thành công"
  *       403:
- *         description: Không có quyền truy cập
+ *         description: "Không có quyền truy cập"
  *       404:
- *         description: Không tìm thấy booking
+ *         description: "Không tìm thấy booking"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getBookingDetails = async (req, res) => {
   try {
@@ -1672,7 +1672,7 @@ exports.getBookingDetails = async (req, res) => {
  * @swagger
  * /api/bookings/my-hotels:
  *   get:
- *     summary: Lấy danh sách booking của khách sạn của chủ khách sạn đang đăng nhập
+ *     summary: "Lấy danh sách booking của khách sạn của chủ khách sạn đang đăng nhập"    
  *     tags: [Booking]
  *     security:
  *       - bearerAuth: []
@@ -1681,44 +1681,44 @@ exports.getBookingDetails = async (req, res) => {
  *         name: status
  *         schema:
  *           type: string
- *         description: Lọc theo trạng thái booking
+ *         description: "Lọc theo trạng thái booking"
  *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp
+ *         description: "Sắp xếp"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
- *         description: Trang
+ *         description: "Trang"
  *       - in: query
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng mỗi trang
+ *         description: "Số lượng mỗi trang"
  *       - in: query
  *         name: hotelId
  *         schema:
  *           type: string
- *         description: Lọc theo khách sạn
+ *         description: "Lọc theo khách sạn"
  *     responses:
  *       200:
- *         description: Lấy danh sách booking thành công
+ *         description: "Lấy danh sách booking thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getMyHotelBookings = async (req, res) => {
   try {

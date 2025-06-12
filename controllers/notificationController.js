@@ -5,15 +5,15 @@ const NotificationService = require("../services/notificationService");
  * @swagger
  * /api/notifications:
  *   get:
- *     summary: Lấy danh sách thông báo của user
+ *     summary: "Lấy danh sách thông báo của user"
  *     tags: [Notification]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy danh sách thông báo thành công
+ *         description: "Lấy danh sách thông báo thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getNotifications = async (req, res) => {
   try {
@@ -37,7 +37,7 @@ exports.getNotifications = async (req, res) => {
  * @swagger
  * /api/notifications/{id}/read:
  *   put:
- *     summary: Đánh dấu thông báo đã đọc
+ *     summary: "Đánh dấu thông báo đã đọc"
  *     tags: [Notification]
  *     security:
  *       - bearerAuth: []
@@ -47,14 +47,14 @@ exports.getNotifications = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID thông báo
+ *         description: "ID thông báo"
  *     responses:
  *       200:
- *         description: Đánh dấu thông báo đã đọc thành công
+ *         description: "Đánh dấu thông báo đã đọc thành công"
  *       404:
- *         description: Không tìm thấy thông báo
+ *         description: "Không tìm thấy thông báo"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.markAsRead = async (req, res) => {
   try {
@@ -89,15 +89,15 @@ exports.markAsRead = async (req, res) => {
  * @swagger
  * /api/notifications/read-all:
  *   put:
- *     summary: Đánh dấu tất cả thông báo đã đọc
+ *     summary: "Đánh dấu tất cả thông báo đã đọc"
  *     tags: [Notification]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Đã đánh dấu tất cả thông báo là đã đọc
+ *         description: "Đã đánh dấu tất cả thông báo là đã đọc"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.markAllAsRead = async (req, res) => {
   try {
@@ -122,7 +122,7 @@ exports.markAllAsRead = async (req, res) => {
  * @swagger
  * /api/notifications/admin:
  *   post:
- *     summary: Gửi thông báo admin
+ *     summary: "Gửi thông báo admin"
  *     tags: [Notification]
  *     security:
  *       - bearerAuth: []
@@ -141,18 +141,18 @@ exports.markAllAsRead = async (req, res) => {
  *                 type: array
  *                 items:
  *                   type: string
- *                 description: Danh sách ID user nhận thông báo
+ *                 description: "Danh sách ID user nhận thông báo"
  *               title:
  *                 type: string
- *                 description: Tiêu đề thông báo
+ *                 description: "Tiêu đề thông báo"
  *               message:
  *                 type: string
- *                 description: Nội dung thông báo
+ *                 description: "Nội dung thông báo"
  *     responses:
  *       200:
- *         description: Gửi thông báo thành công
+ *         description: "Gửi thông báo thành công"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.sendAdminNotification = async (req, res) => {
   try {

@@ -7,7 +7,7 @@ const Room = require("../models/Room");
  * @swagger
  * /api/statistics/summary:
  *   get:
- *     summary: Tổng quan doanh thu
+ *     summary: "Tổng quan doanh thu"
  *     tags: [Statistics]
  *     security:
  *       - bearerAuth: []
@@ -17,16 +17,16 @@ const Room = require("../models/Room");
  *         schema:
  *           type: string
  *           enum: [day, week, month, year]
- *         description: Khoảng thời gian thống kê (mặc định: month)
+ *         description: "Khoảng thời gian thống kê (mặc định: month)"
  *     responses:
  *       200:
- *         description: Lấy tổng quan doanh thu thành công
+ *         description: "Lấy tổng quan doanh thu thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getRevenueSummary = asyncHandler(async (req, res) => {
   const { period = "month" } = req.query; // Default to month
@@ -150,7 +150,7 @@ exports.getRevenueSummary = asyncHandler(async (req, res) => {
  * @swagger
  * /api/statistics/chart:
  *   get:
- *     summary: Biểu đồ doanh thu theo thời gian
+ *     summary: "Biểu đồ doanh thu theo thời gian"
  *     tags: [Statistics]
  *     security:
  *       - bearerAuth: []
@@ -161,29 +161,29 @@ exports.getRevenueSummary = asyncHandler(async (req, res) => {
  *           type: string
  *           format: date
  *         required: true
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
  *         required: true
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *       - in: query
  *         name: groupBy
  *         schema:
  *           type: string
  *           enum: [day, month]
- *         description: Nhóm theo ngày hoặc tháng (mặc định: day)
+ *         description: "Nhóm theo ngày hoặc tháng (mặc định: day)"
  *     responses:
  *       200:
- *         description: Lấy dữ liệu biểu đồ thành công
+ *         description: "Lấy dữ liệu biểu đồ thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getRevenueChart = asyncHandler(async (req, res) => {
   const { from, to, groupBy = "day" } = req.query;
@@ -262,7 +262,7 @@ exports.getRevenueChart = asyncHandler(async (req, res) => {
  * @swagger
  * /api/statistics/top-rooms:
  *   get:
- *     summary: Top phòng có doanh thu cao nhất
+ *     summary: "Top phòng có doanh thu cao nhất"
  *     tags: [Statistics]
  *     security:
  *       - bearerAuth: []
@@ -271,28 +271,28 @@ exports.getRevenueChart = asyncHandler(async (req, res) => {
  *         name: limit
  *         schema:
  *           type: integer
- *         description: Số lượng phòng trả về (mặc định: 5)
+ *         description: "Số lượng phòng trả về (mặc định: 5)"
  *       - in: query
  *         name: from
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày bắt đầu
+ *         description: "Ngày bắt đầu"
  *       - in: query
  *         name: to
  *         schema:
  *           type: string
  *           format: date
- *         description: Ngày kết thúc
+ *         description: "Ngày kết thúc"
  *     responses:
  *       200:
- *         description: Lấy top phòng thành công
+ *         description: "Lấy top phòng thành công"
  *       400:
- *         description: Tham số không hợp lệ
+ *         description: "Tham số không hợp lệ"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getTopRooms = asyncHandler(async (req, res) => {
   const { limit = 5, from, to } = req.query;
@@ -393,17 +393,17 @@ exports.getTopRooms = asyncHandler(async (req, res) => {
  * @swagger
  * /api/statistics/booking:
  *   get:
- *     summary: Thống kê booking
+ *     summary: "Thống kê booking"  
  *     tags: [Statistics]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Lấy thống kê booking thành công
+ *         description: "Lấy thống kê booking thành công"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi server
+ *         description: "Lỗi server"
  */
 exports.getBookingStatistics = asyncHandler(async (req, res) => {
   const ownerId = req.user._id;

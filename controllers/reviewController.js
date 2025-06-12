@@ -6,7 +6,7 @@ const Booking = require("../models/Booking");
  * @swagger
  * /api/reviews:
  *   post:
- *     summary: Tạo đánh giá mới cho khách sạn
+ *     summary: "Tạo đánh giá mới cho khách sạn"
  *     tags: [Review]
  *     security:
  *       - bearerAuth: []
@@ -34,13 +34,13 @@ const Booking = require("../models/Booking");
  *                 type: boolean
  *     responses:
  *       201:
- *         description: Tạo đánh giá thành công
+ *         description: "Tạo đánh giá thành công"
  *       400:
- *         description: Không đủ điều kiện đánh giá hoặc đã đánh giá rồi
+ *         description: "Không đủ điều kiện đánh giá hoặc đã đánh giá rồi"
  *       404:
- *         description: Không tìm thấy khách sạn
+ *         description: "Không tìm thấy khách sạn"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: "Lỗi máy chủ"
  */
 exports.createReview = async (req, res) => {
   try {
@@ -128,7 +128,7 @@ exports.createReview = async (req, res) => {
  * @swagger
  * /api/reviews/{hotelId}:
  *   get:
- *     summary: Lấy tất cả đánh giá của một khách sạn
+ *     summary: "Lấy tất cả đánh giá của một khách sạn"
  *     tags: [Review]
  *     parameters:
  *       - in: path
@@ -136,14 +136,14 @@ exports.createReview = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID khách sạn
+ *         description: "ID khách sạn"
  *     responses:
  *       200:
- *         description: Lấy danh sách đánh giá thành công
+ *         description: "Lấy danh sách đánh giá thành công"
  *       400:
- *         description: Thiếu hotelId trong yêu cầu
+ *         description: "Thiếu hotelId trong yêu cầu"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: "Lỗi máy chủ"
  */
 exports.getHotelReviews = async (req, res) => {
   try {
@@ -200,7 +200,7 @@ exports.getHotelReviews = async (req, res) => {
  * @swagger
  * /api/reviews/{id}:
  *   put:
- *     summary: Cập nhật đánh giá
+ *     summary: "Cập nhật đánh giá"
  *     tags: [Review]
  *     security:
  *       - bearerAuth: []
@@ -210,7 +210,7 @@ exports.getHotelReviews = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID đánh giá
+ *         description: "ID đánh giá"
  *     requestBody:
  *       required: true
  *       content:
@@ -228,13 +228,13 @@ exports.getHotelReviews = async (req, res) => {
  *                 type: boolean
  *     responses:
  *       200:
- *         description: Cập nhật đánh giá thành công
+ *         description: "Cập nhật đánh giá thành công"
  *       403:
- *         description: Không có quyền cập nhật đánh giá
+ *         description: "Không có quyền cập nhật đánh giá"
  *       404:
- *         description: Không tìm thấy đánh giá
+ *         description: "Không tìm thấy đánh giá"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: "Lỗi máy chủ"
  */
 exports.updateReview = async (req, res) => {
   try {
@@ -298,7 +298,7 @@ exports.updateReview = async (req, res) => {
  * @swagger
  * /api/reviews/{id}/respond:
  *   put:
- *     summary: Phản hồi đánh giá (dành cho chủ khách sạn hoặc admin)
+ *     summary: "Phản hồi đánh giá (dành cho chủ khách sạn hoặc admin)"
  *     tags: [Review]
  *     security:
  *       - bearerAuth: []
@@ -308,7 +308,7 @@ exports.updateReview = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID đánh giá
+ *         description: "ID đánh giá"
  *     requestBody:
  *       required: true
  *       content:
@@ -320,16 +320,16 @@ exports.updateReview = async (req, res) => {
  *             properties:
  *               response:
  *                 type: string
- *                 description: Nội dung phản hồi
+ *                 description: "Nội dung phản hồi"
  *     responses:
  *       200:
- *         description: Phản hồi đánh giá thành công
+ *         description: "Phản hồi đánh giá thành công"
  *       403:
- *         description: Không có quyền phản hồi đánh giá
+ *         description: "Không có quyền phản hồi đánh giá"
  *       404:
- *         description: Không tìm thấy đánh giá
+ *         description: "Không tìm thấy đánh giá"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: "Lỗi máy chủ"
  */
 exports.respondToReview = async (req, res) => {
   try {
@@ -380,7 +380,7 @@ exports.respondToReview = async (req, res) => {
  * @swagger
  * /api/reviews/{id}:
  *   delete:
- *     summary: Xóa đánh giá
+ *     summary: "Xóa đánh giá"  
  *     tags: [Review]
  *     security:
  *       - bearerAuth: []
@@ -390,16 +390,16 @@ exports.respondToReview = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: ID đánh giá
+ *         description: "ID đánh giá"
  *     responses:
  *       200:
- *         description: Xóa đánh giá thành công
+ *         description: "Xóa đánh giá thành công"
  *       403:
- *         description: Không có quyền xóa đánh giá
+ *         description: "Không có quyền xóa đánh giá"
  *       404:
- *         description: Không tìm thấy đánh giá
+ *         description: "Không tìm thấy đánh giá"
  *       500:
- *         description: Lỗi máy chủ
+ *         description: "Lỗi máy chủ"
  */
 exports.deleteReview = async (req, res) => {
   try {
