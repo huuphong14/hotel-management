@@ -1,4 +1,4 @@
-const dotenv = require('dotenv');
+const dotenv = require("dotenv");
 dotenv.config();
 
 module.exports = {
@@ -16,10 +16,11 @@ module.exports = {
   clientUrl: process.env.CLIENT_URL,
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    geminiApiKey: process.env.GEMINI_API_KEY,
   },
   facebook: {
     clientId: process.env.FACEBOOK_CLIENT_ID,
-    clientSecret: process.env.FACEBOOK_CLIENT_SECRET
-  }
+    clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+  },
 };

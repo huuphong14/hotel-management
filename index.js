@@ -9,7 +9,7 @@ const session = require("express-session");
 const http = require("http");
 const socketIO = require("./utils/socket");
 const { scheduleUpdateLowestPrices } = require("./utils/cronJobs");
-const { scheduleUserTierUpdate } = require("./utils/userTierScheduler")
+const { scheduleUserTierUpdate } = require("./utils/userTierScheduler");
 const cancelExpiredBookings = require("./jobs/cancelExpiredBookings");
 const promClient = require("prom-client");
 const cron = require("node-cron");
@@ -25,8 +25,8 @@ const roomRoutes = require("./routes/roomRoutes");
 const postRoutes = require("./routes/postRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
-const chatRoutes = require("./routes/chatRoutes"); // Routes cho Dialogflow CX
-const chatbotRoutes = require("./routes/chatbotRoutes"); // Routes mới cho chatbot
+const chatRoutes = require("./routes/chatRoutes"); 
+const chatbotRoutes = require("./routes/chatbotRoutes");
 const voucherRoutes = require("./routes/voucherRoutes");
 const amenityRoute = require("./routes/amenityroute");
 const favoriteRoutes = require("./routes/favoriteRoutes");
@@ -36,6 +36,7 @@ const adminStatisticsRoutes = require("./routes/adminStatisticsRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 const webhook = require("./routes/webhook");
 const upload = require("./routes/upload");
+const geminiRoutes = require("./routes/geminiRoutes");
 
 // Khởi tạo express
 const app = express();
@@ -136,6 +137,7 @@ app.use("/api/admin-statistics", adminStatisticsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/webhook", webhook);
 app.use("/api/uploads", upload);
+app.use("/api/gemini", geminiRoutes);
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -175,10 +177,12 @@ server.listen(PORT, async () => {
   console.log(`API docs: http://localhost:${PORT}/api-docs`);
   try {
     const isDialogflowHealthy = await dialogflowController.testConnection();
-    console.log(`Dialogflow connection: ${isDialogflowHealthy ? 'healthy' : 'unhealthy'}`);
+    console.log(
+      `Dialogflow connection: ${isDialogflowHealthy ? "healthy" : "unhealthy"}`
+    );
   } catch (error) {
-    console.error('Dialogflow connection test failed:', error.message);
-    console.log('Dialogflow connection: unhealthy');
+    console.error("Dialogflow connection test failed:", error.message);
+    console.log("Dialogflow connection: unhealthy");
   }
 });
 

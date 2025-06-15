@@ -990,11 +990,7 @@ exports.getDiscountedHotels = async (req, res) => {
  *         name: sort
  *         schema:
  *           type: string
-<<<<<<< HEAD
- *         description: "Sắp xếp"
-=======
- *         description: Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)
->>>>>>> f8270e0 (update search, location, add tier)
+ *         description: "Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)"
  *       - in: query
  *         name: page
  *         schema:
@@ -1245,39 +1241,27 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  *         name: minRating
  *         schema:
  *           type: number
- *         description: Đánh giá tối thiểu
+ *         description: "Đánh giá tối thiểu"
  *       - in: query
  *         name: maxRating
  *         schema:
  *           type: number
- *         description: Đánh giá tối đa
+ *         description: "Đánh giá tối đa"
  *       - in: query
  *         name: roomType
  *         schema:
  *           type: string
-<<<<<<< HEAD
- *         description: "Loại phòng"
-=======
- *         description: Danh sách loại phòng (cách nhau bằng dấu phẩy, ví dụ: Deluxe,Suite)
->>>>>>> f8270e0 (update search, location, add tier)
+ *         description: "Danh sách loại phòng (cách nhau bằng dấu phẩy, ví dụ: Deluxe,Suite)"
  *       - in: query
  *         name: amenities
  *         schema:
  *           type: string
-<<<<<<< HEAD
- *         description: "Danh sách tiện ích (cách nhau bằng dấu phẩy)"
-=======
- *         description: Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)
->>>>>>> f8270e0 (update search, location, add tier)
+ *         description: "Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
-<<<<<<< HEAD
- *         description: "Sắp xếp"
-=======
- *         description: Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)
->>>>>>> f8270e0 (update search, location, add tier)
+ *         description: "Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)"
  *       - in: query
  *         name: page
  *         schema:
