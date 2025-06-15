@@ -9,6 +9,7 @@ const session = require("express-session");
 const http = require("http");
 const socketIO = require("./utils/socket");
 const { scheduleUpdateLowestPrices } = require("./utils/cronJobs");
+const { scheduleUserTierUpdate } = require("./utils/userTierScheduler")
 const cancelExpiredBookings = require("./jobs/cancelExpiredBookings");
 const promClient = require("prom-client");
 const cron = require("node-cron");
@@ -100,6 +101,7 @@ socketIO.init(server);
 // Cấu hình cron jobs
 scheduleUpdateLowestPrices();
 cron.schedule("0 * * * *", cancelExpiredBookings); // Chạy mỗi giờ để hủy booking quá hạn
+scheduleUserTierUpdate();
 
 // Route để expose Prometheus metrics
 app.get("/metrics", async (req, res) => {
@@ -133,7 +135,7 @@ app.use("/api/statistics", statisticsRoutes);
 app.use("/api/admin-statistics", adminStatisticsRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/webhook", webhook);
-app.use("api/uploads", upload);
+app.use("/api/uploads", upload);
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));

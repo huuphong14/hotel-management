@@ -52,6 +52,12 @@ const NotificationService = require("../services/notificationService");
  *               maxDiscount:
  *                 type: number
  *                 example: 200000
+ *               applicableTiers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [Bronze, Silver, Gold]
+ *                 example: [Silver, Gold]
  *     responses:
  *       201:
  *         description: "Tạo voucher thành công"
@@ -72,6 +78,7 @@ exports.createVoucher = async (req, res) => {
       minOrderValue,
       discountType,
       maxDiscount,
+      applicableTiers
     } = req.body;
 
     // Kiểm tra mã voucher đã tồn tại
@@ -145,6 +152,15 @@ exports.createVoucher = async (req, res) => {
       });
     }
 
+    // Kiểm tra applicableTiers
+    if (applicableTiers && !applicableTiers.every(tier => ['Bronze', 'Silver', 'Gold'].includes(tier))) {
+      return res.status(400).json({
+        success: false,
+        errorCode: "INVALID_TIERS",
+        message: "Hạng người dùng không hợp lệ",
+      });
+    }
+
     // Chuẩn bị đối tượng voucher
     const voucherData = {
       code: code.toUpperCase().trim(),
@@ -156,6 +172,7 @@ exports.createVoucher = async (req, res) => {
       minOrderValue: minOrderValue || 0,
       discountType,
       status: status || "active",
+      applicableTiers: applicableTiers || ['Bronze', 'Silver', 'Gold']
     };
 
     // Chỉ thêm maxDiscount nếu discountType là percentage
@@ -168,7 +185,7 @@ exports.createVoucher = async (req, res) => {
     const voucher = await Voucher.create(voucherData);
 
     // Lấy danh sách user để gửi thông báo
-    const users = await User.find({ role: "user" });
+    const users = await User.find({ role: "user", tier: { $in: voucherData.applicableTiers } });
     const userIds = users.map((user) => user._id);
 
     // Tạo thông báo
@@ -290,6 +307,11 @@ exports.getVouchers = async (req, res) => {
  *                 enum: [percentage, fixed]
  *               maxDiscount:
  *                 type: number
+ *               applicableTiers:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   enum: [Bronze, Silver, Gold]
  *     responses:
  *       200:
  *         description: "Cập nhật voucher thành công"
@@ -311,12 +333,13 @@ exports.updateVoucher = async (req, res) => {
       minOrderValue,
       discountType,
       maxDiscount,
+      applicableTiers
     } = req.body;
 
     const voucher = await Voucher.findById(req.params.id);
 
     if (!voucher) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         errorCode: "VOUCHER_NOT_FOUND",
         message: "Không tìm thấy voucher",
@@ -378,6 +401,15 @@ exports.updateVoucher = async (req, res) => {
       });
     }
 
+    // Kiểm tra applicableTiers
+    if (applicableTiers && !applicableTiers.every(tier => ['Bronze', 'Silver', 'Gold'].includes(tier))) {
+      return res.status(400).json({
+        success: false,
+        errorCode: "INVALID_TIERS",
+        message: "Hạng người dùng không hợp lệ",
+      });
+    }
+
     // Cập nhật thông tin
     if (discount !== undefined) voucher.discount = discount;
     if (startDate) voucher.startDate = newStartDate;
@@ -386,6 +418,7 @@ exports.updateVoucher = async (req, res) => {
     if (usageLimit !== undefined) voucher.usageLimit = usageLimit;
     if (minOrderValue !== undefined) voucher.minOrderValue = minOrderValue;
     if (discountType) voucher.discountType = discountType;
+    if (applicableTiers) voucher.applicableTiers = applicableTiers;
 
     // Xử lý maxDiscount dựa trên discountType
     if (newDiscountType === "percentage") {
@@ -440,13 +473,33 @@ exports.updateVoucher = async (req, res) => {
  *       200:
  *         description: "Lấy danh sách voucher có thể sử dụng thành công"
  *       400:
- *         description: "Dữ liệu không hợp lệ"
+ *         description: Dữ liệu không hợp lệ
+ *       401:
+ *         description: Không xác thực được người dùng
  *       500:
  *         description: "Lỗi server"
  */
 exports.getAvailableVouchers = async (req, res) => {
   try {
     const { totalAmount, page = 1, limit = 10 } = req.query;
+
+    // Lấy thông tin người dùng từ token
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        errorCode: "UNAUTHORIZED",
+        message: "Không xác thực được người dùng",
+      });
+    }
+
+    const user = await User.findById(req.user.id).select('tier');
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        errorCode: "USER_NOT_FOUND",
+        message: "Không tìm thấy người dùng",
+      });
+    }
 
     let parsedTotalAmount = null;
     if (totalAmount !== undefined) {
@@ -461,8 +514,6 @@ exports.getAvailableVouchers = async (req, res) => {
     }
 
     const now = new Date();
-
-    // Lấy thời điểm đầu và cuối ngày hiện tại (giờ địa phương hoặc UTC+7)
     const startOfToday = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -482,11 +533,14 @@ exports.getAvailableVouchers = async (req, res) => {
       999
     );
 
-    // Query: status active, startDate <= endOfToday, expiryDate >= startOfToday
+    // Query: status active, startDate <= endOfToday, expiryDate >= startOfToday, applicableTiers
+    // và không nằm trong danh sách usedBy của người dùng
     const query = {
       status: "active",
       startDate: { $lte: endOfToday },
       expiryDate: { $gte: startOfToday },
+      applicableTiers: user.tier,
+      usedBy: { $ne: req.user.id }, // Loại bỏ voucher đã được sử dụng bởi người dùng
       $or: [
         { usageLimit: null },
         { $expr: { $lt: ["$usageCount", "$usageLimit"] } },
@@ -503,7 +557,7 @@ exports.getAvailableVouchers = async (req, res) => {
 
     const vouchers = await Voucher.find(query)
       .select(
-        "code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount"
+        "code discount discountType maxDiscount minOrderValue startDate expiryDate usageLimit usageCount applicableTiers"
       )
       .sort({ createdAt: -1 })
       .skip(skip)

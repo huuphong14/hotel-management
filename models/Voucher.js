@@ -13,7 +13,7 @@ const voucherSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
-  startDate: {  // Thêm ngày bắt đầu có hiệu lực
+  startDate: {
     type: Date,
     required: true,
     default: Date.now
@@ -29,7 +29,7 @@ const voucherSchema = new mongoose.Schema({
   },
   usageLimit: {
     type: Number,
-    default: null // null là không giới hạn
+    default: null
   },
   usageCount: {
     type: Number,
@@ -41,17 +41,25 @@ const voucherSchema = new mongoose.Schema({
   },
   discountType: {
     type: String,
-    enum: ['fixed', 'percentage'], // Giảm giá cố định hoặc theo phần trăm
+    enum: ['fixed', 'percentage'],
     required: true
   },
   maxDiscount: {
-    type: Number, // Giới hạn số tiền giảm tối đa cho voucher phần trăm
+    type: Number,
     default: null
-  }
+  },
+  applicableTiers: [{
+    type: String,
+    enum: ['Bronze', 'Silver', 'Gold'],
+    default: ['Bronze', 'Silver', 'Gold']
+  }],
+  usedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }]
 }, {
   timestamps: true
 });
-
 
 // Các phương thức khác không thay đổi
 voucherSchema.methods.calculateDiscount = function(originalPrice) {
@@ -74,16 +82,15 @@ voucherSchema.pre('save', function(next) {
   }
   
   if (this.discountType === 'percentage' && this.discount > 100) {
-    this.discount = 100; // Giới hạn giảm giá theo phần trăm không vượt quá 100%
+    this.discount = 100;
   }
   
   if (this.discountType === 'fixed') {
-    this.maxDiscount = null; // Xóa maxDiscount nếu là voucher giảm giá cố định
+    this.maxDiscount = null;
   }
   
-  // Kiểm tra startDate và expiryDate
   if (this.startDate && this.expiryDate && this.startDate > this.expiryDate) {
-    this.startDate = this.expiryDate; // Đảm bảo ngày bắt đầu không sau ngày kết thúc
+    this.startDate = this.expiryDate;
   }
   
   next();
@@ -93,6 +100,21 @@ voucherSchema.pre('save', function(next) {
 voucherSchema.methods.incrementUsage = async function() {
   this.usageCount += 1;
   return this.save();
+};
+
+// Thêm phương thức kiểm tra người dùng đã sử dụng voucher chưa
+voucherSchema.methods.hasUserUsed = function(userId) {
+  return this.usedBy.includes(userId);
+};
+
+// Thêm phương thức đánh dấu người dùng đã sử dụng voucher
+voucherSchema.methods.markAsUsedBy = async function(userId) {
+  if (!this.hasUserUsed(userId)) {
+    this.usedBy.push(userId);
+    await this.incrementUsage();
+    return this.save();
+  }
+  return this;
 };
 
 module.exports = mongoose.model('Voucher', voucherSchema);

@@ -7,6 +7,7 @@ const NotificationService = require('../services/notificationService');
 const sendEmail = require('../utils/sendEmail');
 const { getInvoiceTemplate } = require('../utils/invoiceTemplate');
 const { generatePDF } = require('../utils/generatePDF');
+const Hotel = require('../models/Hotel'); 
 
 class ZaloPayService {
   static config = {
@@ -694,6 +695,7 @@ class ZaloPayService {
         { path: 'voucher', select: 'code discount discountType' }
       ]);
 
+      // Gửi thông báo cho user
       await NotificationService.createNotification({
         user: booking.user._id,
         title: 'Thanh toán thành công',
@@ -702,6 +704,21 @@ class ZaloPayService {
         relatedModel: 'Booking',
         relatedId: booking._id
       });
+
+      // Gửi thông báo cho partner
+      const hotel = await Hotel.findById(booking.room?.hotelId?._id).select('ownerId');
+      if (hotel && hotel.ownerId) {
+        await NotificationService.createNotification({
+          user: hotel.ownerId,
+          title: 'Thanh toán mới',
+          message: `Đơn đặt phòng #${booking._id} tại khách sạn ${booking.room?.hotelId?.name} đã được thanh toán thành công với số tiền ${payment.amount.toLocaleString('vi-VN')}đ.`,
+          type: 'payment',
+          relatedModel: 'Booking',
+          relatedId: booking._id
+        });
+      } else {
+        console.warn(`Không tìm thấy thông tin khách sạn hoặc chủ khách sạn cho booking ${booking._id}`);
+      }
 
       const htmlContent = getInvoiceTemplate({
         _id: booking._id,
@@ -768,10 +785,11 @@ class ZaloPayService {
   static async sendRefundNotification(booking, payment) {
     try {
       await booking.populate([
-        { path: 'room', select: 'name type price' },
+        { path: 'room', select: 'name type price hotelId', populate: { path: 'hotelId', select: 'name address city' } },
         { path: 'user', select: 'name email' }
       ]);
 
+      // Gửi thông báo cho user
       await NotificationService.createNotification({
         user: booking.user._id,
         title: 'Hoàn tiền thành công',
@@ -780,6 +798,21 @@ class ZaloPayService {
         relatedModel: 'Booking',
         relatedId: booking._id
       });
+
+      // Gửi thông báo cho partner
+      const hotel = await Hotel.findById(booking.room?.hotelId?._id).select('ownerId');
+      if (hotel && hotel.ownerId) {
+        await NotificationService.createNotification({
+          user: hotel.ownerId,
+          title: 'Hoàn tiền đặt phòng',
+          message: `Đơn đặt phòng #${booking._id} tại khách sạn ${booking.room?.hotelId?.name} đã được hoàn tiền với số tiền ${payment.amount.toLocaleString('vi-VN')}đ.`,
+          type: 'refund',
+          relatedModel: 'Booking',
+          relatedId: booking._id
+        });
+      } else {
+        console.warn(`Không tìm thấy thông tin khách sạn hoặc chủ khách sạn cho booking ${booking._id}`);
+      }
 
       const message = `
         <h1>Xác nhận hoàn tiền</h1>

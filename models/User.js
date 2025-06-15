@@ -85,15 +85,18 @@ const UserSchema = new mongoose.Schema({
   favoriteHotels: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Hotel'
-  }]
+  }],
+  tier: {
+    type: String,
+    enum: ['Bronze', 'Silver', 'Gold'],
+    default: 'Bronze'
+  }
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
 
-// Indexes để tìm kiếm hiệu quả
-UserSchema.index({ email: 1 });
 UserSchema.index({ role: 1 });
 
 // Virtual fields
@@ -117,6 +120,55 @@ UserSchema.virtual('reviews', {
   foreignField: 'userId',
   justOne: false
 });
+
+// Tính tổng số tiền đơn hàng trong 6 tháng gần nhất
+UserSchema.methods.getTotalBookingAmount = async function() {
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+  const bookings = await mongoose.model('Booking').aggregate([
+    {
+      $match: {
+        userId: this._id,
+        status: { $in: ['completed', 'paid'] }, // Chỉ tính đơn hàng đã hoàn thành hoặc đã thanh toán
+        createdAt: { $gte: sixMonthsAgo }
+      }
+    },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: '$totalPrice' }
+      }
+    }
+  ]);
+
+  return bookings.length > 0 ? bookings[0].totalAmount : 0;
+};
+
+// Cập nhật hạng người dùng dựa trên tổng số tiền
+UserSchema.methods.updateTier = async function() {
+  const totalAmount = await this.getTotalBookingAmount();
+
+  const tierThresholds = {
+    Bronze: 0,
+    Silver: 5000000,
+    Gold: 20000000
+  };
+
+  let newTier = 'Bronze';
+  if (totalAmount >= tierThresholds.Gold) {
+    newTier = 'Gold';
+  } else if (totalAmount >= tierThresholds.Silver) {
+    newTier = 'Silver';
+  }
+
+  if (this.tier !== newTier) {
+    this.tier = newTier;
+    await this.save();
+  }
+
+  return newTier;
+};
 
 // Hash password trước khi lưu
 UserSchema.pre('save', async function(next) {

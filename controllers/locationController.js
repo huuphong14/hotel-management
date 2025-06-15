@@ -6,7 +6,7 @@ const cloudinaryService = require("../config/cloudinaryService");
  * @swagger
  * /api/locations:
  *   post:
- *     summary: "Tạo địa điểm mới"
+ *     summary: Tạo địa điểm mới
  *     tags: [Location]
  *     security:
  *       - bearerAuth: []
@@ -28,9 +28,9 @@ const cloudinaryService = require("../config/cloudinaryService");
  *                 type: string
  *     responses:
  *       201:
- *         description: "Tạo địa điểm thành công"
+ *         description: Tạo địa điểm thành công
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.createLocation = async (req, res) => {
   console.log('🏢 [CREATE LOCATION] Starting location creation process');
@@ -89,13 +89,13 @@ exports.createLocation = async (req, res) => {
  * @swagger
  * /api/locations:
  *   get:
- *     summary: "Lấy danh sách địa điểm"
+ *     summary: Lấy danh sách địa điểm
  *     tags: [Location]
  *     responses:
  *       200:
- *         description: "Lấy danh sách địa điểm thành công"
+ *         description: Lấy danh sách địa điểm thành công
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.getLocations = async (req, res) => {
   console.log('📋 [GET LOCATIONS] Starting to fetch locations list');
@@ -132,7 +132,7 @@ exports.getLocations = async (req, res) => {
  * @swagger
  * /api/locations/{id}:
  *   get:
- *     summary: "Lấy thông tin một địa điểm"
+ *     summary: Lấy thông tin một địa điểm
  *     tags: [Location]
  *     parameters:
  *       - in: path
@@ -143,11 +143,11 @@ exports.getLocations = async (req, res) => {
  *         description: ID địa điểm
  *     responses:
  *       200:
- *         description: "Lấy thông tin địa điểm thành công"
+ *         description: Lấy thông tin địa điểm thành công
  *       404:
- *         description: "Không tìm thấy địa điểm"
+ *         description: Không tìm thấy địa điểm
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.getLocation = async (req, res) => {
   const locationId = req.params.id;
@@ -194,7 +194,7 @@ exports.getLocation = async (req, res) => {
  * @swagger
  * /api/locations/{id}:
  *   put:
- *     summary: "Cập nhật thông tin địa điểm"
+ *     summary: Cập nhật thông tin địa điểm
  *     tags: [Location]
  *     security:
  *       - bearerAuth: []
@@ -221,11 +221,11 @@ exports.getLocation = async (req, res) => {
  *                 type: string
  *     responses:
  *       200:
- *         description: "Cập nhật địa điểm thành công"
+ *         description: Cập nhật địa điểm thành công
  *       404:
- *         description: "Không tìm thấy địa điểm"
+ *         description: Không tìm thấy địa điểm
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.updateLocation = async (req, res) => {
   const locationId = req.params.id;
@@ -318,7 +318,7 @@ exports.updateLocation = async (req, res) => {
  * @swagger
  * /api/locations/{id}:
  *   delete:
- *     summary: "Xóa địa điểm"
+ *     summary: Xóa địa điểm
  *     tags: [Location]
  *     security:
  *       - bearerAuth: []
@@ -331,13 +331,13 @@ exports.updateLocation = async (req, res) => {
  *         description: ID địa điểm
  *     responses:
  *       200:
- *         description: "Xóa địa điểm thành công"
+ *         description: Xóa địa điểm thành công
  *       400:
- *         description: "Không thể xóa địa điểm vì có khách sạn đang sử dụng"
+ *         description: Không thể xóa địa điểm vì có khách sạn đang sử dụng
  *       404:
- *         description: "Không tìm thấy địa điểm"
+ *         description: Không tìm thấy địa điểm
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.deleteLocation = async (req, res) => {
   const locationId = req.params.id;
@@ -423,7 +423,7 @@ exports.deleteLocation = async (req, res) => {
  * @swagger
  * /api/locations/search:
  *   get:
- *     summary: "Tìm kiếm địa điểm theo tên"
+ *     summary: Tìm kiếm địa điểm theo tên
  *     tags: [Location]
  *     parameters:
  *       - in: query
@@ -431,32 +431,32 @@ exports.deleteLocation = async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: "Từ khóa tìm kiếm"
+ *         description: Từ khóa tìm kiếm
  *       - in: query
  *         name: limit
  *         required: false
  *         schema:
  *           type: integer
  *           default: 10
- *         description: "Số lượng kết quả tối đa"
+ *         description: Số lượng kết quả tối đa
  *     responses:
  *       200:
- *         description: "Tìm kiếm địa điểm thành công"
+ *         description: Tìm kiếm địa điểm thành công
  *       400:
- *         description: "Thiếu từ khóa tìm kiếm"
+ *         description: Thiếu từ khóa tìm kiếm
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.searchLocations = async (req, res) => {
-  const { q, limit = 10 } = req.query;
+  const { location, limit = 10 } = req.query; // Đổi từ 'q' thành 'location'
   
   console.log('🔍 [SEARCH LOCATIONS] Starting location search:', { 
-    query: q, 
+    query: location, 
     limit: parseInt(limit) 
   });
   
   try {
-    if (!q || q.trim() === '') {
+    if (!location || location.trim() === '') {
       console.log('⚠️ [SEARCH LOCATIONS] Empty search query provided');
       return res.status(400).json({
         success: false,
@@ -464,7 +464,7 @@ exports.searchLocations = async (req, res) => {
       });
     }
 
-    const searchQuery = q.trim();
+    const searchQuery = location.trim();
     console.log('🔍 [SEARCH LOCATIONS] Searching locations with regex...');
     
     // Tìm kiếm không phân biệt hoa thường và chứa từ khóa
@@ -492,7 +492,7 @@ exports.searchLocations = async (req, res) => {
       message: error.message,
       stack: error.stack,
       name: error.name,
-      searchQuery: q
+      searchQuery: location
     });
     
     res.status(500).json({
@@ -506,13 +506,13 @@ exports.searchLocations = async (req, res) => {
  * @swagger
  * /api/locations/popular:
  *   get:
- *     summary: "Lấy top 10 địa điểm phổ biến nhất"   
+ *     summary: Lấy top 10 địa điểm phổ biến nhất
  *     tags: [Location]
  *     responses:
  *       200:
- *         description: "Lấy danh sách địa điểm phổ biến thành công"
+ *         description: Lấy danh sách địa điểm phổ biến thành công
  *       500:
- *         description: "Lỗi server"
+ *         description: Lỗi server
  */
 exports.getPopularLocations = async (req, res) => {
   console.log('🔥 [GET POPULAR LOCATIONS] Starting to fetch popular locations');
@@ -521,21 +521,32 @@ exports.getPopularLocations = async (req, res) => {
     // Tìm các khách sạn có trạng thái active
     console.log('🏨 [GET POPULAR LOCATIONS] Fetching active hotels...');
     const hotels = await Hotel.find({ status: "active" });
-    
+
     console.log('📊 [GET POPULAR LOCATIONS] Hotels fetched:', {
       totalHotels: hotels.length
     });
 
-    // Đếm số lượng khách sạn theo từng địa điểm
+    // Đếm số lượng khách sạn theo từng địa điểm + gom nhóm khách sạn
     console.log('🧮 [GET POPULAR LOCATIONS] Counting hotels by location...');
     const locationCounts = {};
+    const hotelsByLocation = {};
     let hotelsWithLocation = 0;
     let hotelsWithoutLocation = 0;
-    
+
     hotels.forEach((hotel) => {
       if (hotel.locationId) {
         const locationId = hotel.locationId.toString();
         locationCounts[locationId] = (locationCounts[locationId] || 0) + 1;
+
+        if (!hotelsByLocation[locationId]) {
+          hotelsByLocation[locationId] = [];
+        }
+        hotelsByLocation[locationId].push({
+          _id: hotel._id,
+          name: hotel.name,
+          status: hotel.status,
+        });
+
         hotelsWithLocation++;
       } else {
         hotelsWithoutLocation++;
@@ -551,9 +562,8 @@ exports.getPopularLocations = async (req, res) => {
 
     // Lấy danh sách các locationId
     const locationIds = Object.keys(locationCounts);
-    
+
     console.log('🔍 [GET POPULAR LOCATIONS] Fetching location details...');
-    // Lấy thông tin chi tiết về các địa điểm
     const locations = await Location.find({
       _id: { $in: locationIds },
       status: "active",
@@ -564,7 +574,21 @@ exports.getPopularLocations = async (req, res) => {
       locationNames: locations.map(loc => ({ id: loc._id, name: loc.name }))
     });
 
-    // Kết hợp thông tin và sắp xếp theo số lượng khách sạn (giảm dần)
+    // Tạo map từ locationId => name để log dễ đọc
+    const locationMap = new Map();
+    locations.forEach(loc => locationMap.set(loc._id.toString(), loc.name));
+
+    // 🧾 Log chi tiết từng địa điểm và danh sách khách sạn thuộc địa điểm đó
+    console.log('📌 [GET POPULAR LOCATIONS] Hotels grouped by location:');
+    Object.entries(hotelsByLocation).forEach(([locationId, hotelList]) => {
+      const locationName = locationMap.get(locationId) || 'Unknown';
+      console.log(`📍 Location: ${locationName} (${locationId}) - ${hotelList.length} hotel(s)`);
+      hotelList.forEach(hotel => {
+        console.log(`   - 🏨 ${hotel.name} (ID: ${hotel._id})`);
+      });
+    });
+
+    // Kết hợp thông tin và sắp xếp theo số lượng khách sạn
     console.log('🔄 [GET POPULAR LOCATIONS] Processing and sorting locations...');
     const popularLocations = locations
       .map((location) => ({
@@ -595,10 +619,11 @@ exports.getPopularLocations = async (req, res) => {
       stack: error.stack,
       name: error.name
     });
-    
+
     res.status(500).json({
       success: false,
       message: "Lỗi server",
     });
   }
 };
+

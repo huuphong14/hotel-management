@@ -1,6 +1,6 @@
 const Voucher = require('../models/Voucher');
 
-async function validateVoucher(voucherId, originalPrice, checkInDate, currentDate = new Date()) {
+async function validateVoucher(voucherId, originalPrice, checkInDate, userTier, userId, currentDate = new Date()) {
   try {
     if (!voucherId) {
       return {
@@ -28,6 +28,15 @@ async function validateVoucher(voucherId, originalPrice, checkInDate, currentDat
         success: false,
         errorCode: 'VOUCHER_INACTIVE',
         message: 'Voucher không còn hiệu lực'
+      };
+    }
+
+    // Check if user has already used this voucher
+    if (userId && voucher.hasUserUsed(userId)) {
+      return {
+        success: false,
+        errorCode: 'VOUCHER_ALREADY_USED',
+        message: 'Bạn đã sử dụng voucher này trước đó'
       };
     }
 
@@ -62,6 +71,15 @@ async function validateVoucher(voucherId, originalPrice, checkInDate, currentDat
         success: false,
         errorCode: 'VOUCHER_INVALID_DATE',
         message: 'Voucher không hợp lệ tại thời điểm hiện tại'
+      };
+    }
+
+    // Check user tier
+    if (!voucher.applicableTiers.includes(userTier)) {
+      return {
+        success: false,
+        errorCode: 'INVALID_USER_TIER',
+        message: `Voucher chỉ áp dụng cho các hạng: ${voucher.applicableTiers.join(', ')}`
       };
     }
 

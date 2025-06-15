@@ -6,7 +6,8 @@ const {
   getLocation,
   updateLocation,
   deleteLocation,
-  getPopularLocations
+  getPopularLocations,
+  searchLocations
 } = require('../controllers/locationController');
 
 // Middleware
@@ -35,6 +36,7 @@ const upload = multer({
 
 // Public routes
 router.get('/', getLocations);
+router.get('/search', searchLocations);
 router.get('/popular', getPopularLocations);
 router.get('/:id', getLocation);
 

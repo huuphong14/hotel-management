@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
 const Hotel = require("../models/Hotel");
+const User = require("../models/User")
 const NotificationService = require("../services/notificationService");
 const sendEmail = require("../utils/sendEmail");
 const ZaloPayService = require("../services/zaloPayService");
@@ -145,8 +146,7 @@ exports.createBooking = async (req, res) => {
       session.endSession();
       return res.status(400).json({
         success: false,
-        message:
-          "Ngày check-in không hợp lệ, vui lòng chọn từ ngày hôm nay trở đi",
+        message: "Ngày check-in không hợp lệ, vui lòng chọn từ ngày hôm nay trở đi",
       });
     }
 
@@ -166,13 +166,23 @@ exports.createBooking = async (req, res) => {
         select: 'name address city'
       })
       .session(session);
-    
+
     if (!room) {
       await session.abortTransaction();
       session.endSession();
       return res.status(404).json({
         success: false,
         message: "Không tìm thấy phòng",
+      });
+    }
+
+    // Validate hotel data
+    if (!validateHotelData(room)) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({
+        success: false,
+        message: "Dữ liệu khách sạn không đầy đủ",
       });
     }
 
@@ -188,6 +198,17 @@ exports.createBooking = async (req, res) => {
       roomType: roomTypeName,
       roomId: room._id
     });
+
+    // Get user tier
+    const user = await User.findById(req.user.id).select('tier').session(session);
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy người dùng",
+      });
+    }
 
     // Check room availability
     const isAvailable = await checkRoomAvailability(
@@ -214,7 +235,8 @@ exports.createBooking = async (req, res) => {
     const voucherValidation = await validateVoucher(
       voucherId,
       originalPrice,
-      checkInDate
+      checkInDate,
+      user.tier
     );
     if (!voucherValidation.success) {
       await session.abortTransaction();
@@ -255,7 +277,7 @@ exports.createBooking = async (req, res) => {
       if (
         voucherValidation.voucher.usageLimit &&
         voucherValidation.voucher.usageCount >=
-          voucherValidation.voucher.usageLimit
+        voucherValidation.voucher.usageLimit
       ) {
         voucherValidation.voucher.status = "inactive";
       }
@@ -292,7 +314,7 @@ exports.createBooking = async (req, res) => {
       const recipientName = recipientInfo.name;
       
       return `
-        <h1>Xác nhận đặt phòng</h1>
+        <h1>${isForBooker ? "Xác nhận đặt phòng" : "Thông báo đặt phòng"}</h1>
         ${isForBooker 
           ? `<p>Chào ${recipientName},</p>
              <p>Cảm ơn bạn đã đặt phòng ${bookingFor === "other" ? "cho " + guestInfo.name : ""} tại khách sạn của chúng tôi.</p>` 
@@ -375,7 +397,7 @@ exports.createBooking = async (req, res) => {
     };
     
     try {
-      // Gửi email cho người đặt phòng
+      // Gửi email xác nhận đặt phòng cho người đặt phòng
       console.log(`Attempting to send booking confirmation email to booker: ${contactInfo.email}`);
       const bookerEmailPromise = sendEmail({
         email: contactInfo.email,
@@ -390,7 +412,7 @@ exports.createBooking = async (req, res) => {
       });
       emailPromises.push(bookerEmailPromise);
 
-      // Gửi email cho người lưu trú nếu đặt cho người khác và có email
+      // Gửi email thông báo đặt phòng cho người lưu trú nếu đặt cho người khác và có email
       if (bookingFor === "other" && guestInfo.email && guestInfo.email.trim() !== "") {
         console.log(`Attempting to send booking notification email to guest: ${guestInfo.email}`);
         const guestEmailPromise = sendEmail({
@@ -413,7 +435,6 @@ exports.createBooking = async (req, res) => {
       
     } catch (emailError) {
       console.error("Error in email sending process:", emailError.message, emailError.stack);
-      // Log lỗi nhưng không làm gián đoạn quá trình tạo booking
     }
 
     // Generate payment URL
@@ -456,7 +477,7 @@ exports.createBooking = async (req, res) => {
 
 function validateHotelData(room) {
   const issues = [];
-  
+
   if (!room.hotelId) {
     issues.push("Room không có thông tin hotelId");
   } else {
@@ -467,15 +488,15 @@ function validateHotelData(room) {
       issues.push("Hotel thiếu địa chỉ");
     }
   }
-  
+
   if (!room.roomType) {
     issues.push("Room thiếu roomType");
   }
-  
+
   if (issues.length > 0) {
     console.warn("Dữ liệu thiếu:", issues.join(", "));
   }
-  
+
   return issues.length === 0;
 }
 /**
@@ -528,6 +549,12 @@ exports.retryPayment = async (req, res) => {
       throw new Error("Không tìm thấy booking");
     }
 
+    // Get user tier
+    const user = await User.findById(booking.user._id).select('tier').session(session);
+    if (!user) {
+      throw new Error("Không tìm thấy người dùng");
+    }
+
     // Kiểm tra trạng thái thanh toán trong Payment
     const payment = await Payment.findOne({
       bookingId: bookingId,
@@ -568,7 +595,7 @@ exports.retryPayment = async (req, res) => {
       );
     }
 
-    // Kiểm tra số lần thử thanh toán lại (tối đa 3 lần)
+    // Kiểm tra số lần thử thanh toán lại
     const MAX_RETRY_ATTEMPTS = 3;
     if (booking.retryCount >= MAX_RETRY_ATTEMPTS) {
       throw new Error(
@@ -576,13 +603,13 @@ exports.retryPayment = async (req, res) => {
       );
     }
 
-    // Kiểm tra thời gian tổng cho phép thử lại (48 giờ kể từ khi tạo booking)
+    // Kiểm tra thời gian tổng cho phép thử lại
     const bookingAgeHours = (now - booking.createdAt) / (1000 * 60 * 60);
     if (bookingAgeHours > 48) {
       throw new Error("Đã hết thời gian cho phép thử lại thanh toán");
     }
 
-    // Kiểm tra thời gian kể từ lần thử cuối (hủy nếu quá 24 giờ)
+    // Kiểm tra thời gian kể từ lần thử cuối
     const AUTO_CANCEL_HOURS = 24;
     if (booking.retryCount > 0 && booking.lastRetryAt) {
       const timeSinceLastRetry =
@@ -623,7 +650,8 @@ exports.retryPayment = async (req, res) => {
       const voucherValidation = await validateVoucher(
         booking.voucher,
         booking.originalPrice,
-        booking.checkIn
+        booking.checkIn,
+        user.tier // Truyền user.tier vào validateVoucher
       );
       if (!voucherValidation.success) {
         throw new Error(`Voucher không hợp lệ: ${voucherValidation.message}`);
@@ -696,13 +724,11 @@ exports.retryPayment = async (req, res) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    // Sử dụng req.body.bookingId thay vì bookingId để đảm bảo luôn có giá trị
     const logBookingId = req.body.bookingId || "unknown";
     console.error(
       `Error retrying payment for booking ${logBookingId}: ${error.message}`
     );
     console.error(error.stack);
-    // Ghi metric lỗi, chỉ gọi nếu bookingId tồn tại
     if (req.body.bookingId) {
       recordRetryFailure(
         req.body.bookingId,
@@ -722,8 +748,8 @@ exports.retryPayment = async (req, res) => {
         success: false,
         message:
           error.message.includes("Không") ||
-          error.message.includes("Vui lòng") ||
-          error.message.includes("Đã")
+            error.message.includes("Vui lòng") ||
+            error.message.includes("Đã")
             ? error.message
             : `Lỗi server khi thử thanh toán lại: ${error.message}`,
         details: error.response?.data || error.message,

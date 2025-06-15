@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Booking = require('../models/Booking');
 const Room = require('../models/Room');
+const { ObjectId } = mongoose.Types;
 
 /**
  * Lấy danh sách ID phòng đã đặt trong khoảng thời gian.
@@ -82,12 +83,12 @@ async function checkRoomAvailability(roomId, checkIn, checkOut) {
   });
 
   const isAvailable = conflictingBookings.length === 0;
-  
+
   if (!isAvailable) {
-    console.log(`Room ${roomId} has ${conflictingBookings.length} conflicting bookings:`, 
-      conflictingBookings.map(b => ({ 
-        id: b._id, 
-        checkIn: b.checkIn.toISOString(), 
+    console.log(`Room ${roomId} has ${conflictingBookings.length} conflicting bookings:`,
+      conflictingBookings.map(b => ({
+        id: b._id,
+        checkIn: b.checkIn.toISOString(),
         checkOut: b.checkOut.toISOString(),
         status: b.status
       }))
@@ -115,7 +116,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
 
   // 1. Lấy danh sách phòng đã đặt trong khoảng thời gian
   const bookedRoomIds = await getBookedRoomIds(checkIn, checkOut);
-  
+
   // 2. Tạo query để tìm phòng available và không bị đặt
   const roomQuery = {
     ...query,
@@ -134,7 +135,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
         as: 'hotelInfo'
       }
     },
-    { 
+    {
       $unwind: {
         path: '$hotelInfo',
         preserveNullAndEmptyArrays: true
@@ -181,11 +182,11 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
             if: '$hasValidDiscount',
             then: {
               $round: [
-                { 
+                {
                   $multiply: [
-                    '$price', 
+                    '$price',
                     { $subtract: [1, { $divide: ['$discountPercent', 100] }] }
-                  ] 
+                  ]
                 },
                 0
               ]
@@ -209,7 +210,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     const priceFilter = {};
     if (minPrice) priceFilter.$gte = Number(minPrice);
     if (maxPrice) priceFilter.$lte = Number(maxPrice);
-    
+
     pipeline.push({
       $match: {
         discountedPrice: priceFilter
@@ -236,7 +237,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
   pipeline.push({
     $group: {
       _id: '$hotelInfo._id',
-      hotelName: { $first: '$hotelInfo.name' },
+      name: { $first: '$hotelInfo.name' },
       address: { $first: '$hotelInfo.address' },
       rating: { $first: '$hotelInfo.rating' },
       reviewCount: { $first: '$hotelInfo.reviewCount' },
@@ -313,10 +314,10 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
         case '-rating':
           sortField = { reviewCount: -1, rating: 1 };
           break;
-        case 'discountPercent':
+        case 'highestDiscountPercent':
           sortField = { highestDiscountPercent: 1 };
           break;
-        case '-discountPercent':
+        case '-highestDiscountPercent':
           sortField = { highestDiscountPercent: -1 };
           break;
         default:
@@ -334,11 +335,11 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
 
   // 10. Thực hiện query
   const hotels = await Room.aggregate(pipeline);
-  
+
   console.log(`Found ${hotels.length} hotels with available rooms`);
-  console.log('Hotels summary:', hotels.map(hotel => ({ 
-    _id: hotel._id, 
-    name: hotel.hotelName,
+  console.log('Hotels summary:', hotels.map(hotel => ({
+    _id: hotel._id,
+    name: hotel.name,
     rating: hotel.rating,
     availableRoomCount: hotel.availableRoomCount,
     availableRoomTypes: hotel.availableRoomTypes,
@@ -358,7 +359,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
  */
 async function checkMultipleRoomsAvailability(roomIds, checkIn, checkOut) {
   const results = {};
-  
+
   // Validate input
   if (!Array.isArray(roomIds) || roomIds.length === 0) {
     return results;
@@ -366,7 +367,7 @@ async function checkMultipleRoomsAvailability(roomIds, checkIn, checkOut) {
 
   // Lấy danh sách phòng đã đặt
   const bookedRoomIds = await getBookedRoomIds(checkIn, checkOut);
-  
+
   // Lấy thông tin tất cả phòng cần kiểm tra
   const rooms = await Room.find({
     _id: { $in: roomIds.map(id => new mongoose.Types.ObjectId(id)) }
@@ -375,7 +376,7 @@ async function checkMultipleRoomsAvailability(roomIds, checkIn, checkOut) {
   // Kiểm tra từng phòng
   for (const roomId of roomIds) {
     const room = rooms.find(r => r._id.toString() === roomId);
-    
+
     if (!room) {
       results[roomId] = false; // Phòng không tồn tại
     } else if (room.status !== 'available') {
@@ -395,7 +396,7 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
 
   // 1. Lấy danh sách phòng đã đặt trong khoảng thời gian
   const bookedRoomIds = await getBookedRoomIds(checkIn, checkOut);
-  
+
   // 2. Tạo query để tìm phòng available và không bị đặt
   const roomQuery = {
     ...query,
@@ -414,7 +415,7 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
         as: 'hotelInfo'
       }
     },
-    { 
+    {
       $unwind: {
         path: '$hotelInfo',
         preserveNullAndEmptyArrays: true
@@ -461,11 +462,11 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
             if: '$hasValidDiscount',
             then: {
               $round: [
-                { 
+                {
                   $multiply: [
-                    '$price', 
+                    '$price',
                     { $subtract: [1, { $divide: ['$discountPercent', 100] }] }
-                  ] 
+                  ]
                 },
                 0
               ]
@@ -482,7 +483,7 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
     const priceFilter = {};
     if (minPrice) priceFilter.$gte = Number(minPrice);
     if (maxPrice) priceFilter.$lte = Number(maxPrice);
-    
+
     pipeline.push({
       $match: {
         discountedPrice: priceFilter
@@ -519,39 +520,17 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
   });
 
   // 7. Lọc theo amenities nếu có
-  if (amenities && amenities.length > 0) {
-    const amenityIds = amenities.map(id => new mongoose.Types.ObjectId(id));
-    pipeline.push({
-      $match: {
-        $expr: {
-          $gt: [
-            {
-              $size: {
-                $filter: {
-                  input: '$roomsWithAmenities',
-                  as: 'room',
-                  cond: {
-                    $gt: [
-                      {
-                        $size: {
-                          $filter: {
-                            input: '$$room.amenities',
-                            as: 'amenity',
-                            cond: { $in: ['$$amenity', amenityIds] }
-                          }
-                        }
-                      },
-                      0
-                    ]
-                  }
-                }
-              }
-            },
-            0
-          ]
+  if (amenities && Array.isArray(amenities) && amenities.length > 0) {
+    const amenityIds = amenities
+      .filter(id => mongoose.isValidObjectId(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+    if (amenityIds.length > 0) {
+      pipeline.push({
+        $match: {
+          'roomsWithAmenities.amenities': { $in: amenityIds }
         }
-      }
-    });
+      });
+    }
   }
 
   // 8. Đếm tổng số khách sạn
@@ -564,132 +543,279 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
 }
 
 async function getAvailableRoomsByHotel(hotelId, query, checkIn, checkOut, options = {}) {
+  console.log('=== [START] getAvailableRoomsByHotel ===');
+  console.log('Input params:', {
+    hotelId,
+    query,
+    checkIn: checkIn.toISOString(),
+    checkOut: checkOut.toISOString(),
+    options
+  });
+
   const { sort = 'price', skip = 0, limit = 10, minPrice, maxPrice } = options;
 
   // 1. Lấy danh sách phòng đã đặt trong khoảng thời gian
   const bookedRoomIds = await getBookedRoomIds(checkIn, checkOut);
-  
-  // 2. Tạo query để tìm phòng available và không bị đặt
+  console.log('Booked room IDs:', bookedRoomIds);
+
+  // 2. Tìm tất cả phòng của khách sạn trước khi lọc
+  const allRooms = await Room.find({ hotelId: new mongoose.Types.ObjectId(hotelId) });
+  console.log(`Total rooms in hotel: ${allRooms.length}`);
+
+  // Log thông tin từng phòng trước khi lọc
+  allRooms.forEach(room => {
+    console.log(`\nRoom ${room._id} initial state:`, {
+      name: room.name,
+      status: room.status,
+      capacity: room.capacity,
+      roomType: room.roomType,
+      price: room.price,
+      isBooked: bookedRoomIds.includes(room._id.toString()),
+      amenities: room.amenities?.length || 0
+    });
+  });
+
+  // 3. Tạo query để tìm phòng available và không bị đặt
   const roomQuery = {
     ...query,
     hotelId: new mongoose.Types.ObjectId(hotelId),
     _id: { $nin: bookedRoomIds.map(id => new mongoose.Types.ObjectId(id)) },
     status: 'available'
   };
+  console.log('\nFinal room query:', JSON.stringify(roomQuery, null, 2));
 
-  // 3. Xây dựng pipeline aggregation
+  // 4. Kiểm tra từng điều kiện riêng lẻ
+  const roomsAfterStatus = await Room.find({
+    hotelId: new mongoose.Types.ObjectId(hotelId),
+    status: 'available'
+  });
+  console.log(`\nRooms after status filter: ${roomsAfterStatus.length}`);
+  roomsAfterStatus.forEach(room => {
+    console.log(`Room ${room._id} passed status filter:`, {
+      name: room.name,
+      status: room.status
+    });
+  });
+
+  const roomsAfterBooking = roomsAfterStatus.filter(room => !bookedRoomIds.includes(room._id.toString()));
+  console.log(`\nRooms after booking filter: ${roomsAfterBooking.length}`);
+  roomsAfterBooking.forEach(room => {
+    console.log(`Room ${room._id} passed booking filter:`, {
+      name: room.name,
+      isBooked: false
+    });
+  });
+
+  // Fix capacity filter
+  const requiredCapacity = query.capacity?.$gte || 1; // Lấy giá trị từ $gte hoặc mặc định là 1
+  const roomsAfterCapacity = roomsAfterBooking.filter(room => room.capacity >= requiredCapacity);
+  console.log(`\nRooms after capacity filter (>=${requiredCapacity}): ${roomsAfterCapacity.length}`);
+  roomsAfterBooking.forEach(room => {
+    console.log(`Room ${room._id} capacity check:`, {
+      name: room.name,
+      capacity: room.capacity,
+      requiredCapacity: requiredCapacity,
+      passed: room.capacity >= requiredCapacity
+    });
+  });
+
+  if (query.roomType) {
+    const roomsAfterType = roomsAfterCapacity.filter(room => query.roomType.$in.includes(room.roomType));
+    console.log(`\nRooms after room type filter: ${roomsAfterType.length}`);
+    roomsAfterCapacity.forEach(room => {
+      console.log(`Room ${room._id} room type check:`, {
+        name: room.name,
+        roomType: room.roomType,
+        requiredTypes: query.roomType.$in,
+        passed: query.roomType.$in.includes(room.roomType)
+      });
+    });
+  }
+
+  if (query.amenities) {
+    console.log('\n=== Amenities Filter Details ===');
+    console.log('Required amenities:', query.amenities.$in);
+
+    // Lấy thông tin chi tiết của các amenities
+    const amenitiesDetails = await mongoose.model('Amenity').find({
+      _id: { $in: query.amenities.$in }
+    });
+    console.log('Required amenities details:', amenitiesDetails.map(a => ({
+      id: a._id,
+      name: a.name
+    })));
+
+    // Lấy thông tin chi tiết của amenities cho tất cả phòng
+    const roomAmenitiesMap = new Map();
+    for (const room of roomsAfterCapacity) {
+      const roomAmenities = await mongoose.model('Amenity').find({
+        _id: { $in: room.amenities }
+      });
+      roomAmenitiesMap.set(room._id.toString(), roomAmenities);
+    }
+
+    const roomsAfterAmenities = roomsAfterCapacity.filter(room => {
+      console.log(`\nChecking amenities for room ${room._id} (${room.name}):`);
+
+      const roomAmenities = roomAmenitiesMap.get(room._id.toString()) || [];
+      console.log('Room amenities:', roomAmenities.map(a => ({
+        id: a._id,
+        name: a.name
+      })));
+
+      // Kiểm tra từng amenity yêu cầu
+      const missingAmenities = [];
+      const hasAllAmenities = query.amenities.$in.every(amenityId => {
+        const hasAmenity = roomAmenities.some(roomAmenity =>
+          roomAmenity._id.toString() === amenityId.toString()
+        );
+
+        const amenityDetail = amenitiesDetails.find(a => a._id.toString() === amenityId.toString());
+        if (!hasAmenity) {
+          missingAmenities.push({
+            id: amenityId,
+            name: amenityDetail ? amenityDetail.name : 'Unknown'
+          });
+        }
+
+        console.log(`Checking amenity ${amenityDetail ? amenityDetail.name : amenityId}: ${hasAmenity ? '✓' : '✗'}`);
+        return hasAmenity;
+      });
+
+      if (missingAmenities.length > 0) {
+        console.log('Missing amenities:', missingAmenities);
+      } else {
+        console.log('Room has all required amenities ✓');
+      }
+
+      return hasAllAmenities;
+    });
+
+    console.log(`\nRooms after amenities filter: ${roomsAfterAmenities.length}`);
+    console.log('Rooms that passed amenities filter:');
+    roomsAfterAmenities.forEach(room => {
+      const roomAmenities = roomAmenitiesMap.get(room._id.toString()) || [];
+      console.log(`\nRoom ${room._id} (${room.name}):`, {
+        amenities: roomAmenities.map(a => ({
+          id: a._id,
+          name: a.name
+        }))
+      });
+    });
+
+    console.log('\nRooms that failed amenities filter:');
+    roomsAfterCapacity.filter(room => !roomsAfterAmenities.includes(room)).forEach(room => {
+      const roomAmenities = roomAmenitiesMap.get(room._id.toString()) || [];
+      const missingAmenities = query.amenities.$in
+        .filter(amenityId => !roomAmenities.some(roomAmenity =>
+          roomAmenity._id.toString() === amenityId.toString()
+        ))
+        .map(amenityId => {
+          const amenity = amenitiesDetails.find(a => a._id.toString() === amenityId.toString());
+          return {
+            id: amenityId,
+            name: amenity ? amenity.name : 'Unknown'
+          };
+        });
+
+      console.log(`\nRoom ${room._id} (${room.name}):`, {
+        hasAmenities: roomAmenities.map(a => ({
+          id: a._id,
+          name: a.name
+        })),
+        missingAmenities: missingAmenities
+      });
+    });
+  }
+
+  // 5. Xây dựng pipeline aggregation
   const pipeline = [
-    { $match: roomQuery },
+    // Match rooms by hotel ID and status
+    {
+      $match: {
+        hotelId: new ObjectId(hotelId),
+        status: 'available',
+        _id: { $nin: bookedRoomIds.map(id => new ObjectId(id)) }
+      }
+    },
+    // Add capacity filter if specified
+    ...(query.capacity ? [{
+      $match: {
+        capacity: { $gte: query.capacity.$gte || 1 }
+      }
+    }] : []),
+    // Add amenities filter if specified
+    ...(query.amenities && query.amenities.$in ? [{
+      $match: {
+        amenities: { $in: query.amenities.$in.map(id => new ObjectId(id)) }
+      }
+    }] : []),
+    // Add room type filter if specified
+    ...(query.roomType && query.roomType.$in ? [{
+      $match: {
+        roomType: { $in: query.roomType.$in }
+      }
+    }] : []),
+    // Lookup amenities details
     {
       $lookup: {
         from: 'amenities',
         localField: 'amenities',
         foreignField: '_id',
-        as: 'amenities'
+        as: 'amenitiesDetails'
       }
     },
-    {
-      $addFields: {
-        hasValidDiscount: {
-          $and: [
-            { $gt: ['$discountPercent', 0] },
-            { $ne: ['$discountStartDate', null] },
-            { $ne: ['$discountEndDate', null] },
-            { $lte: ['$discountStartDate', checkIn] },
-            { $gte: ['$discountEndDate', checkIn] }
-          ]
-        }
-      }
-    },
-    {
-      $addFields: {
-        discountedPrice: {
-          $cond: {
-            if: '$hasValidDiscount',
-            then: {
-              $round: [
-                { 
-                  $multiply: [
-                    '$price', 
-                    { $subtract: [1, { $divide: ['$discountPercent', 100] }] }
-                  ] 
-                },
-                0
-              ]
-            },
-            else: '$price'
-          }
-        },
-        currentDiscountPercent: {
-          $cond: {
-            if: '$hasValidDiscount',
-            then: '$discountPercent',
-            else: 0
-          }
-        }
-      }
-    }
-  ];
-
-  // 4. Lọc theo giá nếu có
-  if (minPrice || maxPrice) {
-    const priceFilter = {};
-    if (minPrice) priceFilter.$gte = Number(minPrice);
-    if (maxPrice) priceFilter.$lte = Number(maxPrice);
-    
-    pipeline.push({
+    // Add price range filter if specified
+    ...(minPrice || maxPrice ? [{
       $match: {
-        discountedPrice: priceFilter
+        price: {
+          ...(minPrice && { $gte: Number(minPrice) }),
+          ...(maxPrice && { $lte: Number(maxPrice) })
+        }
       }
-    });
-  }
-
-  // 5. Sắp xếp
-  let sortField = {};
-  switch (sort) {
-    case 'price':
-      sortField = { discountedPrice: 1 };
-      break;
-    case '-price':
-      sortField = { discountedPrice: -1 };
-      break;
-    case 'discountPercent':
-      sortField = { currentDiscountPercent: 1 };
-      break;
-    case '-discountPercent':
-      sortField = { currentDiscountPercent: -1 };
-      break;
-    default:
-      sortField = { discountedPrice: 1 };
-  }
-  pipeline.push({ $sort: sortField });
-
-  // 6. Phân trang
-  pipeline.push(
+    }] : []),
+    // Sort
+    {
+      $sort: {
+        ...(sort === 'price' || sort === 'price-asc' ? { price: 1 } :
+          sort === 'price-desc' ? { price: -1 } :
+            sort === 'capacity' || sort === 'capacity-asc' ? { capacity: 1 } :
+              sort === 'capacity-desc' ? { capacity: -1 } :
+                { price: 1 }) // Default sort by price ascending
+      }
+    },
+    // Paginate
     { $skip: skip },
     { $limit: limit }
-  );
-
-  // 7. Thực hiện query
-  const rooms = await Room.aggregate(pipeline);
-
-  // 8. Lấy tổng số phòng (không phân trang)
-  const countPipeline = [
-    ...pipeline.slice(0, -2), // Bỏ skip và limit
-    { $count: 'total' }
   ];
+
+  console.log('Executing aggregation pipeline...');
+  console.log('Pipeline:', JSON.stringify(pipeline, null, 2));
+  const rooms = await Room.aggregate(pipeline);
+  console.log('Found', rooms.length, 'rooms after all filters');
+
+  // Get total count without pagination
+  const countPipeline = [...pipeline];
+  countPipeline.splice(-2); // Remove skip and limit
+  countPipeline.push({ $count: 'total' });
+
   const totalResult = await Room.aggregate(countPipeline);
   const total = totalResult[0]?.total || 0;
+  console.log('Total rooms (without pagination):', total);
 
+  console.log('=== [END] getAvailableRoomsByHotel ===');
   return {
     rooms,
-    total
+    total,
+    page: Math.floor(skip / limit) + 1,
+    limit,
+    totalPages: Math.ceil(total / limit)
   };
 }
 
-module.exports = { 
-  getBookedRoomIds, 
-  checkRoomAvailability, 
+module.exports = {
+  getBookedRoomIds,
+  checkRoomAvailability,
   findAvailableRooms,
   checkMultipleRoomsAvailability,
   countAvailableHotels,
