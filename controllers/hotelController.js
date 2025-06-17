@@ -589,7 +589,7 @@ exports.deleteHotel = async (req, res) => {
  * @swagger
  * /api/hotels/{id}/images:
  *   post:
- *     summary: "Upload hình ảnh cho khách sạn" 
+ *     summary: "Upload hình ảnh cho khách sạn"
  *     tags: [Hotel]
  *     security:
  *       - bearerAuth: []
@@ -847,7 +847,7 @@ exports.updateFeaturedImage = async (req, res) => {
  * @swagger
  * /api/hotels/discounts:
  *   get:
- *     summary: "Lấy danh sách khách sạn đang có giảm giá"  
+ *     summary: "Lấy danh sách khách sạn đang có giảm giá"
  *     tags: [Hotel]
  *     parameters:
  *       - in: query
@@ -990,7 +990,7 @@ exports.getDiscountedHotels = async (req, res) => {
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)
+ *         description: "Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)"
  *       - in: query
  *         name: page
  *         schema:
@@ -1025,21 +1025,26 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       roomTypes,
       roomAmenities, // Tham số mới cho tiện nghi phòng
       hotelAmenities, // Tham số mới cho tiện nghi khách sạn
-      sort = 'price',
+      sort = "price",
       page = 1,
       limit = 10,
     } = req.query;
 
     // Validate sort parameter
     const validSorts = [
-      'price', '-price',
-      'rating', '-rating',
-      'highestDiscountPercent', '-highestDiscountPercent'
+      "price",
+      "-price",
+      "rating",
+      "-rating",
+      "highestDiscountPercent",
+      "-highestDiscountPercent",
     ];
     if (sort && !validSorts.includes(sort)) {
       return res.status(400).json({
         success: false,
-        message: `Giá trị sort không hợp lệ. Các giá trị hợp lệ: ${validSorts.join(', ')}`,
+        message: `Giá trị sort không hợp lệ. Các giá trị hợp lệ: ${validSorts.join(
+          ", "
+        )}`,
       });
     }
 
@@ -1099,8 +1104,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     // Validate room amenities if provided
     let roomAmenityIds = [];
     if (roomAmenities) {
-      roomAmenityIds = roomAmenities.split(',').map(id => id.trim());
-      if (!roomAmenityIds.every(id => mongoose.isValidObjectId(id))) {
+      roomAmenityIds = roomAmenities.split(",").map((id) => id.trim());
+      if (!roomAmenityIds.every((id) => mongoose.isValidObjectId(id))) {
         return res.status(400).json({
           success: false,
           message: "Một hoặc nhiều ID tiện nghi phòng không hợp lệ",
@@ -1112,8 +1117,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     // Validate hotel amenities if provided
     let hotelAmenityIds = [];
     if (hotelAmenities) {
-      hotelAmenityIds = hotelAmenities.split(',').map(id => id.trim());
-      if (!hotelAmenityIds.every(id => mongoose.isValidObjectId(id))) {
+      hotelAmenityIds = hotelAmenities.split(",").map((id) => id.trim());
+      if (!hotelAmenityIds.every((id) => mongoose.isValidObjectId(id))) {
         return res.status(400).json({
           success: false,
           message: "Một hoặc nhiều ID tiện nghi khách sạn không hợp lệ",
@@ -1171,7 +1176,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
         roomAmenities: roomAmenityIds.length > 0 ? roomAmenityIds : undefined,
-        hotelAmenities: hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined
+        hotelAmenities:
+          hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined,
       }
     );
 
@@ -1186,7 +1192,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
         roomAmenities: roomAmenityIds.length > 0 ? roomAmenityIds : undefined,
-        hotelAmenities: hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined
+        hotelAmenities:
+          hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined,
       }
     );
 
@@ -1271,12 +1278,12 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  *         name: amenities
  *         schema:
  *           type: string
- *         description: Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)
+ *         description: "Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)"
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)
+ *         description: "Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)"
  *       - in: query
  *         name: page
  *         schema:
@@ -1309,7 +1316,7 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
       maxPrice,
       roomType,
       amenities,
-      sort = 'price',
+      sort = "price",
       page = 1,
       limit = 10,
     } = req.query;
@@ -1360,29 +1367,45 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
 
     // Validate sort parameter
     const validSorts = [
-      'price', '-price',
-      'capacity', '-capacity',
-      'roomType', '-roomType',
-      'highestDiscountPercent', '-highestDiscountPercent'
+      "price",
+      "-price",
+      "capacity",
+      "-capacity",
+      "roomType",
+      "-roomType",
+      "highestDiscountPercent",
+      "-highestDiscountPercent",
     ];
     if (sort && !validSorts.includes(sort)) {
       return res.status(400).json({
         success: false,
-        message: `Giá trị sort không hợp lệ. Các giá trị hợp lệ: ${validSorts.join(', ')}`,
+        message: `Giá trị sort không hợp lệ. Các giá trị hợp lệ: ${validSorts.join(
+          ", "
+        )}`,
       });
     }
 
     // Parse roomType
     let roomTypesArray = [];
     if (roomType) {
-      roomTypesArray = roomType.split(',').map(type => type.trim());
-      const validRoomTypes = ['Standard', 'Superior', 'Deluxe', 'Suite', 'Family'];
-      const invalidTypes = roomTypesArray.filter(type => !validRoomTypes.includes(type));
+      roomTypesArray = roomType.split(",").map((type) => type.trim());
+      const validRoomTypes = [
+        "Standard",
+        "Superior",
+        "Deluxe",
+        "Suite",
+        "Family",
+      ];
+      const invalidTypes = roomTypesArray.filter(
+        (type) => !validRoomTypes.includes(type)
+      );
       if (invalidTypes.length > 0) {
         console.warn("Invalid room types:", invalidTypes);
         return res.status(400).json({
           success: false,
-          message: `Loại phòng không hợp lệ: ${invalidTypes.join(', ')}. Các loại phòng hợp lệ: ${validRoomTypes.join(', ')}`,
+          message: `Loại phòng không hợp lệ: ${invalidTypes.join(
+            ", "
+          )}. Các loại phòng hợp lệ: ${validRoomTypes.join(", ")}`,
         });
       }
     }
@@ -1390,8 +1413,8 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
     // Validate amenities
     let amenityIds = [];
     if (amenities) {
-      amenityIds = amenities.split(',').map(id => id.trim());
-      if (!amenityIds.every(id => mongoose.isValidObjectId(id))) {
+      amenityIds = amenities.split(",").map((id) => id.trim());
+      if (!amenityIds.every((id) => mongoose.isValidObjectId(id))) {
         console.warn("Invalid amenity IDs:", amenityIds);
         return res.status(400).json({
           success: false,
@@ -1403,10 +1426,16 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
 
     console.log("Parsed Dates:", { checkInDate, checkOutDate });
     console.log("Parsed Filters:", {
-      minPrice, maxPrice, roomTypesArray, amenityIds, sort, page, limit
+      minPrice,
+      maxPrice,
+      roomTypesArray,
+      amenityIds,
+      sort,
+      page,
+      limit,
     });
 
-    const hotel = await Hotel.findOne({ _id: hotelId, status: 'active' });
+    const hotel = await Hotel.findOne({ _id: hotelId, status: "active" });
     if (!hotel) {
       console.warn("Hotel not found or inactive:", hotelId);
       return res.status(404).json({
@@ -1473,7 +1502,6 @@ exports.getAvailableRoomsByHotel = async (req, res) => {
     });
 
     console.log("=== [END] getAvailableRoomsByHotel Controller ===");
-
   } catch (error) {
     console.error("Get available rooms error:", {
       message: error.message,
