@@ -1023,7 +1023,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       minRating,
       maxRating,
       roomTypes,
-      amenities,
+      roomAmenities, // Tham số mới cho tiện nghi phòng
+      hotelAmenities, // Tham số mới cho tiện nghi khách sạn
       sort = 'price',
       page = 1,
       limit = 10,
@@ -1095,18 +1096,31 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       }
     }
 
-    // Validate amenities if provided
-    let amenityIds = [];
-    if (amenities) {
-      amenityIds = amenities.split(',').map(id => id.trim());
-      if (!amenityIds.every(id => mongoose.isValidObjectId(id))) {
+    // Validate room amenities if provided
+    let roomAmenityIds = [];
+    if (roomAmenities) {
+      roomAmenityIds = roomAmenities.split(',').map(id => id.trim());
+      if (!roomAmenityIds.every(id => mongoose.isValidObjectId(id))) {
         return res.status(400).json({
           success: false,
-          message: "Một hoặc nhiều ID tiện nghi không hợp lệ",
+          message: "Một hoặc nhiều ID tiện nghi phòng không hợp lệ",
         });
       }
     }
-    console.log("Parsed Amenities:", amenityIds);
+    console.log("Parsed Room Amenities:", roomAmenityIds);
+
+    // Validate hotel amenities if provided
+    let hotelAmenityIds = [];
+    if (hotelAmenities) {
+      hotelAmenityIds = hotelAmenities.split(',').map(id => id.trim());
+      if (!hotelAmenityIds.every(id => mongoose.isValidObjectId(id))) {
+        return res.status(400).json({
+          success: false,
+          message: "Một hoặc nhiều ID tiện nghi khách sạn không hợp lệ",
+        });
+      }
+    }
+    console.log("Parsed Hotel Amenities:", hotelAmenityIds);
 
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
@@ -1156,7 +1170,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         locationId: location._id,
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
-        amenities: amenityIds.length > 0 ? amenityIds : undefined
+        roomAmenities: roomAmenityIds.length > 0 ? roomAmenityIds : undefined,
+        hotelAmenities: hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined
       }
     );
 
@@ -1170,7 +1185,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         locationId: location._id,
         minRating: minRating ? Number(minRating) : undefined,
         maxRating: maxRating ? Number(maxRating) : undefined,
-        amenities: amenityIds.length > 0 ? amenityIds : undefined
+        roomAmenities: roomAmenityIds.length > 0 ? roomAmenityIds : undefined,
+        hotelAmenities: hotelAmenityIds.length > 0 ? hotelAmenityIds : undefined
       }
     );
 

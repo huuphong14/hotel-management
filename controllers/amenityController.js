@@ -61,6 +61,13 @@ exports.createAmenity = async (req, res) => {
  *   get:
  *     summary: "Lấy danh sách tiện ích"
  *     tags: [Amenity]
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [hotel, room]
+ *         description: "Lọc theo loại tiện ích (hotel hoặc room)"
  *     responses:
  *       200:
  *         description: "Lấy danh sách tiện ích thành công"
@@ -69,11 +76,27 @@ exports.createAmenity = async (req, res) => {
  */
 exports.getAmenities = async (req, res) => {
   try {
-    const amenities = await Amenity.find();
+    // Tạo filter object
+    const filter = {};
+    
+    // Nếu có query parameter type, thêm vào filter
+    if (req.query.type) {
+      if (req.query.type === 'hotel' || req.query.type === 'room') {
+        filter.type = req.query.type;
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: "Loại tiện ích không hợp lệ. Chỉ chấp nhận 'hotel' hoặc 'room'",
+        });
+      }
+    }
+
+    const amenities = await Amenity.find(filter);
 
     res.status(200).json({
       success: true,
       count: amenities.length,
+      filter: req.query.type ? { type: req.query.type } : "all",
       data: amenities,
     });
   } catch (error) {

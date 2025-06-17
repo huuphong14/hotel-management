@@ -108,10 +108,10 @@ async function checkRoomAvailability(roomId, checkIn, checkOut) {
  * @returns {Promise<Object[]>} Danh sách phòng trống.
  */
 async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
-  const { sort = 'price', skip = 0, limit = 10, minPrice, maxPrice, locationId, minRating, maxRating, amenities } = options;
+  const { sort = 'price', skip = 0, limit = 10, minPrice, maxPrice, locationId, minRating, maxRating, roomAmenities, hotelAmenities } = options;
 
   console.log('findAvailableRooms - Query:', query);
-  console.log('findAvailableRooms - Options:', options);
+  console.log('findAvailableRooms - Options:', { ...options, roomAmenities, hotelAmenities });
   console.log('findAvailableRooms - Period:', { checkIn, checkOut });
 
   // 1. Lấy danh sách phòng đã đặt trong khoảng thời gian
@@ -123,6 +123,11 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     _id: { $nin: bookedRoomIds.map(id => new mongoose.Types.ObjectId(id)) },
     status: 'available'
   };
+
+  // Thêm điều kiện lọc amenities của phòng nếu có
+  if (roomAmenities && roomAmenities.length > 0) {
+    roomQuery.amenities = { $in: roomAmenities.map(id => new mongoose.Types.ObjectId(id)) };
+  }
 
   // 3. Xây dựng pipeline aggregation
   const pipeline = [
@@ -148,6 +153,15 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     pipeline.push({
       $match: {
         'hotelInfo.locationId': new mongoose.Types.ObjectId(locationId)
+      }
+    });
+  }
+
+  // Thêm điều kiện lọc theo amenities của khách sạn nếu có
+  if (hotelAmenities && hotelAmenities.length > 0) {
+    pipeline.push({
+      $match: {
+        'hotelInfo.amenities': { $in: hotelAmenities.map(id => new mongoose.Types.ObjectId(id)) }
       }
     });
   }
@@ -244,7 +258,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
       images: { $first: '$hotelInfo.images' },
       featuredImage: { $first: '$hotelInfo.featuredImage' },
       policies: { $first: '$hotelInfo.policies' },
-      amenities: { $first: '$hotelInfo.amenities' },
+      amenities: { $first: '$hotelInfo.amenities' }, 
       locationId: { $first: '$hotelInfo.locationId' },
       locationName: { $first: '$hotelInfo.locationName' },
       lowestPrice: { $min: '$discountedPrice' },
@@ -261,43 +275,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     }
   });
 
-  // 7. Lọc theo amenities nếu có
-  if (amenities && amenities.length > 0) {
-    const amenityIds = amenities.map(id => new mongoose.Types.ObjectId(id));
-    pipeline.push({
-      $match: {
-        $expr: {
-          $gt: [
-            {
-              $size: {
-                $filter: {
-                  input: '$roomsWithAmenities',
-                  as: 'room',
-                  cond: {
-                    $gt: [
-                      {
-                        $size: {
-                          $filter: {
-                            input: '$$room.amenities',
-                            as: 'amenity',
-                            cond: { $in: ['$$amenity', amenityIds] }
-                          }
-                        }
-                      },
-                      0
-                    ]
-                  }
-                }
-              }
-            },
-            0
-          ]
-        }
-      }
-    });
-  }
-
-  // 8. Sắp xếp theo tiêu chí
+  // 7. Sắp xếp theo tiêu chí
   if (sort) {
     let sortField = sort;
     if (typeof sort === 'string') {
@@ -327,13 +305,13 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     pipeline.push({ $sort: sortField });
   }
 
-  // 9. Phân trang
+  // 8. Phân trang
   pipeline.push(
     { $skip: skip },
     { $limit: limit }
   );
 
-  // 10. Thực hiện query
+  // 9. Thực hiện query
   const hotels = await Room.aggregate(pipeline);
 
   console.log(`Found ${hotels.length} hotels with available rooms`);
@@ -344,12 +322,12 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     availableRoomCount: hotel.availableRoomCount,
     availableRoomTypes: hotel.availableRoomTypes,
     lowestPrice: hotel.lowestPrice,
-    highestDiscountPercent: hotel.highestDiscountPercent
+    highestDiscountPercent: hotel.highestDiscountPercent,
+    hotelAmenities: hotel.amenities
   })));
 
   return hotels;
 }
-
 /**
  * Kiểm tra nhiều phòng cùng lúc
  * @param {string[]} roomIds - Danh sách ID phòng cần kiểm tra
@@ -392,7 +370,7 @@ async function checkMultipleRoomsAvailability(roomIds, checkIn, checkOut) {
 }
 
 async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
-  const { minPrice, maxPrice, locationId, minRating, maxRating, amenities } = options;
+  const { minPrice, maxPrice, locationId, minRating, maxRating, roomAmenities, hotelAmenities } = options;
 
   // 1. Lấy danh sách phòng đã đặt trong khoảng thời gian
   const bookedRoomIds = await getBookedRoomIds(checkIn, checkOut);
@@ -403,6 +381,11 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
     _id: { $nin: bookedRoomIds.map(id => new mongoose.Types.ObjectId(id)) },
     status: 'available'
   };
+
+  // Thêm điều kiện lọc amenities của phòng nếu có
+  if (roomAmenities && roomAmenities.length > 0) {
+    roomQuery.amenities = { $in: roomAmenities.map(id => new mongoose.Types.ObjectId(id)) };
+  }
 
   // 3. Xây dựng pipeline aggregation
   const pipeline = [
@@ -428,6 +411,15 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
     pipeline.push({
       $match: {
         'hotelInfo.locationId': new mongoose.Types.ObjectId(locationId)
+      }
+    });
+  }
+
+  // Thêm điều kiện lọc theo amenities của khách sạn nếu có
+  if (hotelAmenities && hotelAmenities.length > 0) {
+    pipeline.push({
+      $match: {
+        'hotelInfo.amenities': { $in: hotelAmenities.map(id => new mongoose.Types.ObjectId(id)) }
       }
     });
   }
@@ -519,21 +511,7 @@ async function countAvailableHotels(query, checkIn, checkOut, options = {}) {
     }
   });
 
-  // 7. Lọc theo amenities nếu có
-  if (amenities && Array.isArray(amenities) && amenities.length > 0) {
-    const amenityIds = amenities
-      .filter(id => mongoose.isValidObjectId(id))
-      .map(id => new mongoose.Types.ObjectId(id));
-    if (amenityIds.length > 0) {
-      pipeline.push({
-        $match: {
-          'roomsWithAmenities.amenities': { $in: amenityIds }
-        }
-      });
-    }
-  }
-
-  // 8. Đếm tổng số khách sạn
+  // 7. Đếm tổng số khách sạn
   pipeline.push({
     $count: 'total'
   });
