@@ -103,7 +103,7 @@ UserSchema.index({ role: 1 });
 UserSchema.virtual('bookings', {
   ref: 'Booking',
   localField: '_id',
-  foreignField: 'userId',
+  foreignField: 'user',
   justOne: false
 });
 
@@ -121,23 +121,34 @@ UserSchema.virtual('reviews', {
   justOne: false
 });
 
-// Tính tổng số tiền đơn hàng trong 6 tháng gần nhất
+// Cấu hình ngưỡng hạng và thời gian tính toán
+const TIER_CONFIG = {
+  thresholds: {
+    Bronze: 0,
+    Silver: 5000000,
+    Gold: 20000000
+  },
+  calculationPeriod: 6, // Số tháng tính toán
+  downgradeGracePeriod: 3 // Số tháng cho phép giữ hạng khi không đạt ngưỡng
+};
+
+// Tính tổng số tiền đơn hàng trong khoảng thời gian cấu hình
 UserSchema.methods.getTotalBookingAmount = async function() {
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  const monthsAgo = new Date();
+  monthsAgo.setMonth(monthsAgo.getMonth() - TIER_CONFIG.calculationPeriod);
 
   const bookings = await mongoose.model('Booking').aggregate([
     {
       $match: {
-        userId: this._id,
-        status: { $in: ['completed', 'paid'] }, // Chỉ tính đơn hàng đã hoàn thành hoặc đã thanh toán
-        createdAt: { $gte: sixMonthsAgo }
+        user: this._id, // ✅ Sửa từ userId thành user
+        status: { $in: ['completed'] }, // ✅ Chỉ lấy completed
+        createdAt: { $gte: monthsAgo }
       }
     },
     {
       $group: {
         _id: null,
-        totalAmount: { $sum: '$totalPrice' }
+        totalAmount: { $sum: '$finalPrice' }
       }
     }
   ]);
@@ -148,18 +159,29 @@ UserSchema.methods.getTotalBookingAmount = async function() {
 // Cập nhật hạng người dùng dựa trên tổng số tiền
 UserSchema.methods.updateTier = async function() {
   const totalAmount = await this.getTotalBookingAmount();
-
-  const tierThresholds = {
-    Bronze: 0,
-    Silver: 5000000,
-    Gold: 20000000
-  };
-
+  const oldTier = this.tier;
   let newTier = 'Bronze';
-  if (totalAmount >= tierThresholds.Gold) {
+
+  // Xác định hạng mới dựa trên tổng số tiền
+  if (totalAmount >= TIER_CONFIG.thresholds.Gold) {
     newTier = 'Gold';
-  } else if (totalAmount >= tierThresholds.Silver) {
+  } else if (totalAmount >= TIER_CONFIG.thresholds.Silver) {
     newTier = 'Silver';
+  }
+
+  // Xử lý trường hợp hạng giảm
+  let isDowngraded = false;
+  if (this.tier !== newTier && this.tier !== 'Bronze') {
+    // Kiểm tra xem có đang trong thời gian gia hạn không
+    const lastTierUpdate = this.updatedAt || this.createdAt;
+    const monthsSinceLastUpdate = (Date.now() - lastTierUpdate) / (30 * 24 * 60 * 60 * 1000);
+
+    if (monthsSinceLastUpdate < TIER_CONFIG.downgradeGracePeriod && newTier < this.tier) {
+      // Giữ nguyên hạng cũ trong thời gian gia hạn
+      newTier = this.tier;
+    } else if (newTier < this.tier) {
+      isDowngraded = true;
+    }
   }
 
   if (this.tier !== newTier) {
@@ -167,7 +189,12 @@ UserSchema.methods.updateTier = async function() {
     await this.save();
   }
 
-  return newTier;
+  return {
+    oldTier,
+    newTier,
+    totalAmount,
+    isDowngraded
+  };
 };
 
 // Hash password trước khi lưu
@@ -222,4 +249,9 @@ UserSchema.methods.getVerificationToken = function() {
   return verificationToken;
 };
 
-module.exports = mongoose.model('User', UserSchema);
+const User = mongoose.model('User', UserSchema);
+
+// Export default User model và TIER_CONFIG như properties
+User.TIER_CONFIG = TIER_CONFIG;
+
+module.exports = User;

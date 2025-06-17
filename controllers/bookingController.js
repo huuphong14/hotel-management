@@ -1949,3 +1949,199 @@ exports.getMyHotelBookings = async (req, res) => {
     });
   }
 };
+exports.cancelExpiredBookings = async () => {
+  console.log("=== BẮT ĐẦU KIỂM TRA VÀ HỦY BOOKING QUÁ HẠN ===");
+  
+  const session = await mongoose.startSession();
+  let transactionStarted = false;
+  
+  try {
+    // Bước 1: Tìm booking cần hủy TRƯỚC KHI bắt đầu transaction
+    const timeoutMinutes = 30;
+    const timeoutThreshold = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+
+    console.log(`Tìm booking với điều kiện:`);
+    console.log(`- status: pending`);
+    console.log(`- paymentStatus: pending`);
+    console.log(`- createdAt <= ${timeoutThreshold.toISOString()}`);
+
+    // ✅ TÌM BOOKING TRƯỚC, KHÔNG DÙNG SESSION
+    const unpaidBookings = await Booking.find({
+      status: "pending",
+      paymentStatus: "pending",
+      createdAt: { $lte: timeoutThreshold },
+    })
+      .populate([
+        { path: "user", select: "name email" },
+        {
+          path: "room",
+          select: "roomType roomNumber price",
+          populate: { path: "hotelId", select: "name address" },
+        },
+      ])
+      .lean(); // ✅ SỬ DỤNG .lean() ĐỂ TỐI ƯU PERFORMANCE
+
+    console.log(`Tìm thấy ${unpaidBookings.length} booking quá hạn chưa thanh toán`);
+
+    // Nếu không có booking nào cần xử lý, return luôn
+    if (unpaidBookings.length === 0) {
+      console.log("=== KHÔNG CÓ BOOKING NÀO CẦN HỦY ===");
+      return { processedCount: 0, timestamp: new Date() };
+    }
+
+    // Bước 2: Bắt đầu transaction CHỈ KHI có booking cần xử lý
+    await session.startTransaction({
+      readConcern: { level: 'majority' },
+      writeConcern: { w: 'majority' },
+      maxTimeMS: 30000 // ✅ TIMEOUT 30 GIÂY
+    });
+    transactionStarted = true;
+
+    let processedCount = 0;
+    const errors = [];
+
+    // Bước 3: Xử lý từng booking một cách an toàn
+    for (const bookingData of unpaidBookings) {
+      try {
+        console.log(`Đang xử lý booking ${bookingData._id}...`);
+        
+        // ✅ TÌM LẠI BOOKING TRONG TRANSACTION ĐỂ ĐẢM BẢO TÍNH NHẤT QUÁN
+        const booking = await Booking.findById(bookingData._id).session(session);
+        
+        if (!booking) {
+          console.log(`Booking ${bookingData._id} không tồn tại, bỏ qua`);
+          continue;
+        }
+
+        // ✅ KIỂM TRA LẠI TRẠNG THÁI (TRÁNH RACE CONDITION)
+        if (booking.status !== 'pending' || booking.paymentStatus !== 'pending') {
+          console.log(`Booking ${bookingData._id} đã được xử lý rồi, bỏ qua`);
+          continue;
+        }
+
+        // Cập nhật booking
+        await Booking.findByIdAndUpdate(
+          booking._id,
+          {
+            $set: {
+              status: "cancelled",
+              paymentStatus: "cancelled", 
+              cancelledAt: new Date(),
+              cancellationReason: "auto_timeout_unpaid"
+            }
+          },
+          { session, new: true }
+        );
+
+        // Tạo notification
+        try {
+          await NotificationService.createNotification(
+            {
+              user: bookingData.user._id,
+              title: "Đặt phòng đã bị hủy tự động",
+              message: `Đơn đặt phòng #${bookingData._id} đã bị hủy do chưa hoàn tất thanh toán trong vòng 30 phút`,
+              type: "booking",
+              relatedModel: "Booking",
+              relatedId: bookingData._id,
+            },
+            { session }
+          );
+        } catch (notifError) {
+          console.error(`Lỗi tạo notification cho booking ${bookingData._id}:`, notifError.message);
+          // Không throw, cho phép tiếp tục xử lý
+        }
+
+        processedCount++;
+        console.log(`✅ Đã hủy booking ${bookingData._id}`);
+
+      } catch (bookingError) {
+        console.error(`Lỗi xử lý booking ${bookingData._id}:`, bookingError.message);
+        errors.push({
+          bookingId: bookingData._id,
+          error: bookingError.message
+        });
+        // Tiếp tục với booking tiếp theo thay vì throw
+      }
+    }
+
+    // Bước 4: Commit transaction
+    await session.commitTransaction();
+    console.log(`✅ Transaction committed thành công. Processed: ${processedCount}/${unpaidBookings.length}`);
+
+    // Bước 5: Gửi email NGOÀI transaction (tránh timeout)
+    setImmediate(async () => {
+      await sendEmailNotifications(unpaidBookings.slice(0, processedCount));
+    });
+
+    if (errors.length > 0) {
+      console.warn(`⚠️ Có ${errors.length} lỗi trong quá trình xử lý:`, errors);
+    }
+
+    console.log("=== HOÀN TẤT KIỂM TRA VÀ HỦY BOOKING QUÁ HẠN ===");
+    
+    return {
+      processedCount,
+      totalFound: unpaidBookings.length,
+      errors: errors.length,
+      timestamp: new Date()
+    };
+
+  } catch (error) {
+    console.error(`❌ Lỗi nghiêm trọng trong cancelExpiredBookings:`, error.message);
+    
+    // Chỉ abort nếu transaction đã bắt đầu
+    if (transactionStarted) {
+      try {
+        await session.abortTransaction();
+        console.log("Transaction đã được abort");
+      } catch (abortError) {
+        console.error("Lỗi khi abort transaction:", abortError.message);
+      }
+    }
+    
+    throw error;
+  } finally {
+    await session.endSession();
+  }
+};
+
+// 2. HÀM GỬI EMAIL TÁCH RIÊNG (CHẠY NGOÀI TRANSACTION)
+async function sendEmailNotifications(cancelledBookings) {
+  console.log(`Gửi ${cancelledBookings.length} email thông báo hủy booking...`);
+  
+  for (const bookingData of cancelledBookings) {
+    try {
+      const hotelName = bookingData.room?.hotelId?.name || "Khách sạn không xác định";
+      const message = `
+        <h1>Thông báo hủy đặt phòng</h1>
+        <p>Xin chào ${bookingData.user.name},</p>
+        <p>Đơn đặt phòng #${bookingData._id} của bạn tại ${hotelName} đã bị hủy tự động do chưa hoàn tất thanh toán trong vòng 30 phút.</p>
+        <p>Thông tin đặt phòng:</p>
+        <ul>
+          <li>Mã đặt phòng: ${bookingData._id}</li>
+          <li>Khách sạn: ${hotelName}</li>
+          <li>Loại phòng: ${bookingData.room?.roomType || "Không xác định"}</li>
+          <li>Ngày check-in: ${new Date(bookingData.checkIn).toLocaleDateString("vi-VN")}</li>
+          <li>Ngày check-out: ${new Date(bookingData.checkOut).toLocaleDateString("vi-VN")}</li>
+        </ul>
+        <p>Vui lòng tạo một đặt phòng mới nếu bạn muốn tiếp tục.</p>
+        <p>Cảm ơn bạn đã sử dụng dịch vụ của chúng tôi!</p>
+      `;
+
+      await sendEmail({
+        email: bookingData.user.email,
+        subject: `Hủy đặt phòng tự động - Mã: ${bookingData._id.toString().slice(-8)}`,
+        message,
+      });
+      
+      console.log(`📧 Đã gửi email tới ${bookingData.user.email}`);
+      
+      // Delay nhỏ giữa các email để tránh spam
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (emailError) {
+      console.error(`❌ Lỗi gửi email cho ${bookingData.user.email}:`, emailError.message);
+    }
+  }
+}
+

@@ -12,7 +12,6 @@ async function recordRetryFailure(bookingId, paymentMethod, error) {
   const failedCount = await Payment.countDocuments({ bookingId, status: 'failed' });
   if (failedCount >= 3) {
     console.warn(`Critical: Booking ${bookingId} has ${failedCount} failed payment attempts`);
-    // TODO: Gửi cảnh báo qua email hoặc Slack
   }
 }
 

@@ -1,37 +1,41 @@
-const Booking = require('../models/Booking');
-const NotificationService = require('../services/notificationService');
+const cron = require("node-cron");
+const { cancelExpiredBookings } = require("../controllers/bookingController");
 
-async function cancelExpiredBookings() {
-  console.log('Running job to cancel expired bookings');
-  const now = new Date();
-  const AUTO_CANCEL_HOURS = 24;
+let isRunning = false;
 
-  try {
-    const expiredBookings = await Booking.find({
-      status: 'pending',
-      retryCount: { $gt: 0 },
-      lastRetryAt: { $lt: new Date(now - AUTO_CANCEL_HOURS * 60 * 60 * 1000) }
-    });
-
-    for (const booking of expiredBookings) {
-      booking.status = 'cancelled';
-      booking.cancelledAt = new Date();
-      booking.cancellationReason = 'payment_timeout';
-      await booking.save();
-
-      await NotificationService.createNotification({
-        user: booking.user,
-        title: 'Booking Cancelled',
-        message: `Booking #${booking._id} has been cancelled due to payment timeout`,
-        type: 'booking',
-        relatedModel: 'Booking',
-        relatedId: booking._id
-      });
-      console.log(`Auto-cancelled booking ${booking._id}`);
-    }
-  } catch (error) {
-    console.error('Error in cancelExpiredBookings job:', error);
+cron.schedule("*/5 * * * *", async () => {
+  if (isRunning) {
+    console.log("Cron job đang chạy, bỏ qua lần này");
+    return;
   }
-}
+  
+  isRunning = true;
+  const startTime = Date.now();
+  
+  try {
+    console.log(`[${new Date().toISOString()}] Bắt đầu cron job kiểm tra booking quá hạn...`);
+    
+    const result = await cancelExpiredBookings();
+    
+    const duration = Date.now() - startTime;
+    console.log(`Cron job hoàn thành trong ${duration}ms`);
+    console.log(`Kết quả: ${result.processedCount}/${result.totalFound} booking đã xử lý`);
+    
+    if (result.errors > 0) {
+      console.warn(`Có ${result.errors} lỗi trong quá trình xử lý`);
+    }
+    
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[${new Date().toISOString()}] Cron job thất bại sau ${duration}ms:`);
+    console.error(`Error: ${error.message}`);
+    console.error(`Stack: ${error.stack}`);
+    
+    // TODO: Có thể gửi alert tới admin ở đây
+    
+  } finally {
+    isRunning = false;
+  }
+});
 
-module.exports = cancelExpiredBookings;
+console.log(" Cron job hủy booking tự động đã được khởi tạo (mỗi 5 phút)");

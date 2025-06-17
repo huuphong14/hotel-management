@@ -990,7 +990,7 @@ exports.getDiscountedHotels = async (req, res) => {
  *         name: sort
  *         schema:
  *           type: string
- *         description: "Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)"
+ *         description: Sắp xếp (price, -price, rating, -rating, highestDiscountPercent, -highestDiscountPercent)
  *       - in: query
  *         name: page
  *         schema:
@@ -1251,17 +1251,16 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
  *         name: roomType
  *         schema:
  *           type: string
- *         description: "Danh sách loại phòng (cách nhau bằng dấu phẩy, ví dụ: Deluxe,Suite)"
  *       - in: query
  *         name: amenities
  *         schema:
  *           type: string
- *         description: "Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)"
+ *         description: Danh sách ID tiện ích (cách nhau bằng dấu phẩy, phòng phải có ít nhất một tiện ích trong danh sách)
  *       - in: query
  *         name: sort
  *         schema:
  *           type: string
- *         description: "Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)"
+ *         description: Sắp xếp (price, -price, capacity, -capacity, roomType, -roomType, highestDiscountPercent, -highestDiscountPercent)
  *       - in: query
  *         name: page
  *         schema:

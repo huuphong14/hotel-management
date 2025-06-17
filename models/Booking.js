@@ -162,7 +162,8 @@ bookingSchema.index({ paymentId: 1 });
 bookingSchema.index({ transactionId: 1 });
 bookingSchema.index({ refundTransactionId: 1 });
 bookingSchema.index({ status: 1, checkIn: 1, checkOut: 1 });
-bookingSchema.index({ retryCount: 1, lastRetryAt: 1 }); // Thêm index mới
+bookingSchema.index({ retryCount: 1, lastRetryAt: 1 }); 
+bookingSchema.index({ status: 1, paymentStatus: 1, createdAt: 1 });
 
 bookingSchema.pre('save', function(next) {
   if (this.checkOut <= this.checkIn) {

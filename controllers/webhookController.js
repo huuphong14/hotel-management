@@ -1,287 +1,180 @@
-const mongoose = require('mongoose');
 const Hotel = require('../models/Hotel');
 const Room = require('../models/Room');
-const Amenity = require('../models/Amenity');
 const Location = require('../models/Location');
+const Amenity = require('../models/Amenity');
+const Voucher = require('../models/Voucher');
 
-async function searchHotels(req, res) {
-  try {
-    const {
-      location,
-      check_in_date,
-      check_out_date,
-      number_of_people,
-      budget,
-      amenities
-    } = req.body.sessionInfo?.parameters || {};
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-    // Chuyển đổi check_in_date và check_out_date
-    const checkInDateStr = check_in_date && typeof check_in_date === 'object'
-      ? `${check_in_date.year}-${check_in_date.month.toString().padStart(2, '0')}-${check_in_date.day.toString().padStart(2, '0')}`
-      : check_in_date;
-    const checkOutDateStr = check_out_date && typeof check_out_date === 'object'
-      ? `${check_out_date.year}-${check_out_date.month.toString().padStart(2, '0')}-${check_out_date.day.toString().padStart(2, '0')}`
-      : check_out_date;
+// Hàm xây dựng truy vấn MongoDB
+async function buildQuery(params) {
+  const query = { status: 'active' }; // Chỉ lấy khách sạn đang hoạt động
 
-    // Kiểm tra tham số bắt buộc
-    if (!location || !checkInDateStr || !checkOutDateStr || !number_of_people) {
-      console.log('Missing required parameters:', { location, checkInDateStr, checkOutDateStr, number_of_people });
-      return res.status(400).json({
-        fulfillmentResponse: {
-          messages: [
-            {
-              text: {
-                text: ['Vui lòng cung cấp đầy đủ thông tin: địa điểm, ngày nhận phòng, ngày trả phòng, và số người.']
-              }
-            }
-          ]
-        }
+  // Lọc theo địa điểm
+  if (params.location) {
+    const location = await Location.findOne({ 
+      name: { $regex: params.location, $options: 'i' }, 
+      status: 'active' 
+    });
+    if (location) {
+      query.locationId = location._id;
+    } else {
+      throw new Error('Không tìm thấy địa điểm');
+    }
+  }
+
+  // Lọc theo giá
+  if (params.price_min || params.price_max) {
+    query.lowestPrice = {};
+    if (params.price_min) query.lowestPrice.$gte = Number(params.price_min);
+    if (params.price_max) query.lowestPrice.$lte = Number(params.price_max);
+  }
+
+  // Lọc theo tiện ích
+  if (params.amenities && params.amenities.length) {
+    const amenities = await Amenity.find({ 
+      name: { $in: params.amenities }, 
+      type: 'hotel' 
+    });
+    query.amenities = { $all: amenities.map(a => a._id) };
+  }
+
+  // Lọc theo đánh giá
+  if (params.rating) {
+    query.rating = { $gte: Number(params.rating) };
+  }
+
+  // Lọc theo chính sách (ví dụ: cho phép thú cưng)
+  if (params.pet_policy) {
+    query['policies.petPolicy'] = params.pet_policy;
+  }
+
+  return query;
+}
+
+// Hàm thực thi truy vấn
+async function executeQuery(hotelQuery, params) {
+  // Tìm khách sạn
+  let hotels = await Hotel.find(hotelQuery)
+    .populate('locationId', 'name')
+    .populate('amenities', 'name')
+    .limit(5) // Giới hạn tối đa 5 khách sạn
+    .lean();
+
+  // Lọc phòng nếu có tiêu chí phòng
+  if (params.room_type || params.capacity || params.bed_type || params.room_amenities) {
+    const roomQuery = { status: 'available' };
+
+    if (params.room_type) roomQuery.roomType = params.room_type;
+    if (params.capacity) roomQuery.capacity = { $gte: Number(params.capacity) };
+    if (params.bed_type) roomQuery.bedType = params.bed_type;
+    if (params.room_amenities && params.room_amenities.length) {
+      const amenities = await Amenity.find({ 
+        name: { $in: params.room_amenities }, 
+        type: 'room' 
       });
+      roomQuery.amenities = { $all: amenities.map(a => a._id) };
     }
 
-    // Kiểm tra ngày hợp lệ
-    const checkInDate = new Date(checkInDateStr);
-    const checkOutDate = new Date(checkOutDateStr);
-    if (isNaN(checkInDate) || isNaN(checkOutDate) || checkOutDate <= checkInDate) {
-      console.log('Invalid date range:', { checkInDateStr, checkOutDateStr });
-      return res.status(400).json({
-        fulfillmentResponse: {
-          messages: [
-            {
-              text: {
-                text: ['Ngày trả phòng phải sau ngày nhận phòng.']
-              }
-            }
-          ]
-        }
-      });
-    }
+    // Lấy phòng cho mỗi khách sạn
+    hotels = await Promise.all(hotels.map(async (hotel) => {
+      roomQuery.hotelId = hotel._id;
+      const rooms = await Room.find(roomQuery)
+        .populate('amenities', 'name')
+        .lean();
+      return { ...hotel, rooms };
+    }));
 
-    // Tìm locationId
-    const locationDoc = await Location.findOne({ name: location, status: 'active' });
-    if (!locationDoc) {
-      console.log('Location not found:', { location });
-      return res.status(200).json({
-        fulfillmentResponse: {
-          messages: [
-            {
-              text: {
-                text: [`Không tìm thấy địa điểm ${location}. Vui lòng thử lại!`]
-              }
-            }
-          ]
-        }
-      });
-    }
+    // Lọc khách sạn có phòng phù hợp
+    hotels = hotels.filter(hotel => hotel.rooms && hotel.rooms.length > 0);
+  }
 
-    // Xây dựng query cho Room
-    const roomQuery = {
-      capacity: { $gte: parseInt(number_of_people) },
-      status: 'available'
-    };
-    if (budget) {
-      roomQuery.price = { $lte: parseInt(budget) };
-    }
-
-    // Xử lý amenities - FIX: Tìm ObjectId của amenities trước
-    let amenityIds = [];
-    if (amenities && Array.isArray(amenities) && amenities.length > 0) {
-      const validAmenities = amenities.filter(amenity => typeof amenity === 'string' && amenity.trim() !== '');
-      if (validAmenities.length === 0) {
-        console.log('No valid amenities provided:', { amenities });
-      } else {
-        try {
-          console.log('Querying Amenities with names:', { validAmenities });
-          
-          // Tìm amenities theo tên và lấy ObjectId
-          const amenityDocs = await Amenity.find({ 
-            name: { $in: validAmenities }, 
-            type: 'room'
-          }).select('_id name').lean();
-          
-          amenityIds = amenityDocs.map(doc => doc._id);
-          console.log('Found amenities:', { amenityDocs, amenityIds });
-          
-          // Chỉ thêm điều kiện amenities nếu tìm thấy amenities hợp lệ
-          if (amenityIds.length > 0) {
-            roomQuery.amenities = { $all: amenityIds };
-          } else {
-            console.log('No matching amenities found for:', { validAmenities });
-            // Không return lỗi ngay mà vẫn tiếp tục tìm kiếm không có điều kiện amenities
-          }
-        } catch (error) {
-          console.error('Error querying amenities:', error.message, error.stack);
-          // Không return lỗi ngay mà vẫn tiếp tục tìm kiếm không có điều kiện amenities
-        }
-      }
-    }
-
-    console.log('Final room query:', roomQuery);
-
-    // Tìm các phòng phù hợp - không populate amenities ngay
-    const rooms = await Room.find(roomQuery).lean();
-      
-    if (!rooms || rooms.length === 0) {
-      console.log('No rooms found:', { roomQuery });
-      
-      // Nếu không tìm thấy phòng có amenities yêu cầu, thử tìm không có điều kiện amenities
-      if (amenityIds.length > 0) {
-        delete roomQuery.amenities;
-        console.log('Retrying without amenities filter:', roomQuery);
-        
-        const roomsWithoutAmenities = await Room.find(roomQuery).lean();
-          
-        if (roomsWithoutAmenities && roomsWithoutAmenities.length > 0) {
-          return res.status(200).json({
-            fulfillmentResponse: {
-              messages: [
-                {
-                  text: {
-                    text: [`Không tìm thấy phòng có đủ tiện nghi yêu cầu. Tôi sẽ tìm các khách sạn phù hợp khác ở ${location}.`]
-                  }
-                }
-              ]
-            }
-          });
-        }
-      }
-      
-      return res.status(404).json({
-        fulfillmentResponse: {
-          messages: [
-            {
-              text: {
-                text: ['Không tìm thấy phòng phù hợp với yêu cầu của bạn.']
-              }
-            }
-          ]
-        }
-      });
-    }
-
-    // Lấy danh sách hotelId
-    const hotelIds = [...new Set(rooms.map(room => room.hotelId.toString()))];
-
-    // Tìm khách sạn phù hợp
-    const hotels = await Hotel.find({
-      _id: { $in: hotelIds },
-      locationId: locationDoc._id,
-      status: 'active'
-    })
-      .populate('amenities', 'name')
-      .limit(5)
-      .lean();
-      
-    if (!hotels || hotels.length === 0) {
-      console.log('No hotels found:', { hotelIds, locationId: locationDoc._id });
-      return res.status(404).json({
-        fulfillmentResponse: {
-          messages: [
-            {
-              text: {
-                text: ['Rất tiếc, không tìm thấy khách sạn phù hợp. Bạn muốn thay đổi tiêu chí tìm kiếm không?']
-              }
-            }
-          ]
-        }
-      });
-    }
-
-    // Populate amenities cho rooms một cách an toàn
-    const populatedRooms = [];
-    for (const room of rooms) {
-      try {
-        if (room.amenities && room.amenities.length > 0) {
-          // Lọc ra những ObjectId hợp lệ
-          const validAmenityIds = room.amenities.filter(id => {
-            return mongoose.Types.ObjectId.isValid(id);
-          });
-          
-          if (validAmenityIds.length > 0) {
-            const roomAmenities = await Amenity.find({
-              _id: { $in: validAmenityIds }
-            }).select('name').lean();
-            
-            populatedRooms.push({
-              ...room,
-              amenities: roomAmenities
-            });
-          } else {
-            populatedRooms.push({
-              ...room,
-              amenities: []
-            });
-          }
-        } else {
-          populatedRooms.push({
-            ...room,
-            amenities: []
-          });
-        }
-      } catch (error) {
-        console.error('Error populating amenities for room:', room._id, error.message);
-        populatedRooms.push({
+  // Áp dụng voucher nếu có
+  if (params.voucher_code) {
+    const voucher = await Voucher.findOne({ 
+      code: params.voucher_code, 
+      status: 'active',
+      expiryDate: { $gte: new Date() },
+      $or: [{ usageLimit: null }, { usageCount: { $lt: '$usageLimit' } }]
+    });
+    if (voucher) {
+      hotels = hotels.map(hotel => ({
+        ...hotel,
+        rooms: hotel.rooms ? hotel.rooms.map(room => ({
           ...room,
-          amenities: []
-        });
-      }
+          discountedPrice: voucher.calculateDiscount(room.price)
+        })) : []
+      }));
     }
+  }
 
-    // Tính giá thấp nhất và tiện nghi
-    const hotelResults = hotels.map(hotel => {
-      const hotelRooms = populatedRooms.filter(room => room.hotelId.toString() === hotel._id.toString());
-      const lowestPrice = Math.min(...hotelRooms.map(room => room.price));
-      const hotelAmenities = hotel.amenities ? hotel.amenities.map(a => a.name) : [];
-      const roomAmenities = [...new Set(hotelRooms.flatMap(room => 
-        room.amenities ? room.amenities.map(a => a.name) : []
-      ))];
-      return {
-        name: hotel.name,
-        address: hotel.address,
-        lowestPrice,
-        rating: hotel.rating || 0,
-        amenities: [...new Set([...hotelAmenities, ...roomAmenities])],
-        description: hotel.description || 'Không có mô tả'
-      };
-    });
+  // Kiểm tra ngày (giả định phòng trống nếu status là available)
+  if (params.check_in_date && params.check_out_date) {
+    // Trong hệ thống thực tế, cần kiểm tra lịch đặt phòng
+    hotels = hotels.filter(hotel => hotel.rooms && hotel.rooms.length > 0);
+  }
 
-    // Tạo phản hồi
-    const responseText = hotelResults.map((hotel, index) => {
-      const amenitiesText = hotel.amenities.length > 0 ? hotel.amenities.join(', ') : 'Không có thông tin tiện nghi';
-      return `${index + 1}. ${hotel.name} - ${hotel.lowestPrice.toLocaleString('vi-VN')} VNĐ/đêm, đánh giá: ${hotel.rating.toFixed(1)}/5, tiện nghi: ${amenitiesText}.`;
-    }).join('\n');
+  // Giới hạn 3-5 khách sạn
+  return hotels.slice(0, Math.min(hotels.length, 5)).slice(-Math.max(3, Math.min(hotels.length, 5)));
+}
 
-    return res.status(200).json({
+// Hàm định dạng phản hồi
+function formatResponse(hotels, params) {
+  if (!hotels.length) {
+    return {
       fulfillmentResponse: {
-        messages: [
-          {
-            text: {
-              text: [`Tôi tìm thấy các khách sạn sau ở ${location}:\n${responseText}\nBạn muốn xem chi tiết khách sạn nào? (Chọn số hoặc tên).`]
-            }
+        messages: [{
+          text: {
+            text: ['Không tìm thấy khách sạn phù hợp với tiêu chí của bạn.']
           }
-        ]
-      },
-      sessionInfo: {
-        parameters: {
-          hotel_results: hotelResults
-        }
+        }]
       }
-    });
+    };
+  }
 
+  const messages = hotels.map(hotel => {
+    let text = `${hotel.name} ở ${hotel.locationId.name}, Đánh giá: ${hotel.rating}/5`;
+    if (hotel.rooms && hotel.rooms.length) {
+      text += `\nPhòng trống: ${hotel.rooms.map(r => `${r.name} (${r.roomType}, ${r.discountedPrice ? r.discountedPrice : r.price} VNĐ)`).join(', ')}`;
+    }
+    text += `\nXem chi tiết: ${CLIENT_URL}/hoteldetail/${hotel._id}`;
+    return text;
+  });
+
+  return {
+    fulfillmentResponse: {
+      messages: [{
+        text: {
+          text: [`Tìm thấy ${hotels.length} khách sạn:`, ...messages]
+        }
+      }]
+    },
+    sessionInfo: {
+      parameters: params // Giữ tham số session
+    }
+  };
+}
+
+// Controller chính
+exports.handleWebhook = async (req, res) => {
+  const { sessionInfo } = req.body;
+  const params = sessionInfo.parameters;
+
+  try {
+    const query = await buildQuery(params);
+    const results = await executeQuery(query, params);
+    const response = formatResponse(results, params);
+    res.json(response);
   } catch (error) {
-    console.error('Webhook error:', error.message, error.stack);
-    return res.status(500).json({
+    console.error('Lỗi webhook:', error);
+    res.json({
       fulfillmentResponse: {
-        messages: [
-          {
-            text: {
-              text: ['Đã có lỗi xảy ra khi tìm kiếm khách sạn. Vui lòng thử lại sau!']
-            }
+        messages: [{
+          text: {
+            text: ['Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.']
           }
-        ]
+        }]
       }
     });
   }
-}
-
-module.exports = { searchHotels };
+};

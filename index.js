@@ -8,9 +8,9 @@ const passport = require("passport");
 const session = require("express-session");
 const http = require("http");
 const socketIO = require("./utils/socket");
-const { scheduleUpdateLowestPrices } = require("./utils/cronJobs");
-const { scheduleUserTierUpdate } = require("./utils/userTierScheduler");
-const cancelExpiredBookings = require("./jobs/cancelExpiredBookings");
+
+const { scheduleUpdateLowestPrices, scheduleClearExpiredDiscounts } = require('./jobs/cronJobs');
+const { scheduleUserTierUpdate } = require("./jobs/userTierScheduler")
 const promClient = require("prom-client");
 const cron = require("node-cron");
 const swaggerUi = require("swagger-ui-express");
@@ -101,7 +101,8 @@ socketIO.init(server);
 
 // Cấu hình cron jobs
 scheduleUpdateLowestPrices();
-cron.schedule("0 * * * *", cancelExpiredBookings); // Chạy mỗi giờ để hủy booking quá hạn
+scheduleClearExpiredDiscounts();
+require("./jobs/cancelExpiredBookings"); 
 scheduleUserTierUpdate();
 
 // Route để expose Prometheus metrics
