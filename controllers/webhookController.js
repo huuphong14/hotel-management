@@ -1,178 +1,406 @@
-const Hotel = require('../models/Hotel');
-const Room = require('../models/Room');
+const { validateVoucher } = require('../services/voucherService');
+const { findAvailableRooms } = require('../services/roomService');
 const Location = require('../models/Location');
 const Amenity = require('../models/Amenity');
-const Voucher = require('../models/Voucher');
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-// Hàm xây dựng truy vấn MongoDB
-async function buildQuery(params) {
-  const query = { status: 'active' }; // Chỉ lấy khách sạn đang hoạt động
+// Hàm chuyển đổi {year, month, day} thành Date object
+function parseDateObject(dateObj) {
+  if (dateObj && typeof dateObj === 'object' && dateObj.year && dateObj.month && dateObj.day) {
+    return new Date(dateObj.year, dateObj.month - 1, dateObj.day);
+  }
+  return null;
+}
 
-  // Lọc theo địa điểm
-  if (params.location) {
+// Hàm chuyển đổi Date object thành chuỗi YYYY-MM-DD
+function formatDateToString(date) {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
+  
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Hàm xử lý date-period, date và các trường hợp ngày tháng
+function processDateInputs(params) {
+  console.log('Input params for date processing:', JSON.stringify({
+    date_period: params['date-period'],
+    check_in_date: params.check_in_date,
+    check_out_date: params.check_out_date,
+    date: params.date
+  }, null, 2));
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  
+  let checkInDate = null;
+  let checkOutDate = null;
+  
+  if (params['date-period']) {
+    if (params['date-period'].startDate) {
+      checkInDate = parseDateObject(params['date-period'].startDate);
+    }
+    if (params['date-period'].endDate) {
+      checkOutDate = parseDateObject(params['date-period'].endDate);
+    }
+  }
+  
+  if (!checkInDate) {
+    if (params.check_in_date) {
+      checkInDate = new Date(params.check_in_date);
+      if (isNaN(checkInDate.getTime())) {
+        checkInDate = null;
+      }
+    } else if (params.date) {
+      if (typeof params.date === 'object') {
+        checkInDate = parseDateObject(params.date);
+      } else {
+        checkInDate = new Date(params.date);
+        if (isNaN(checkInDate.getTime())) {
+          checkInDate = null;
+        }
+      }
+    }
+  }
+  
+  if (!checkOutDate && params.check_out_date) {
+    checkOutDate = new Date(params.check_out_date);
+    if (isNaN(checkOutDate.getTime())) {
+      checkOutDate = null;
+    }
+  }
+  
+  if (!checkInDate) {
+    checkInDate = today;
+  }
+  if (!checkOutDate) {
+    checkOutDate = new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000);
+  }
+  
+  if (checkOutDate <= checkInDate) {
+    checkOutDate = new Date(checkInDate.getTime() + 24 * 60 * 60 * 1000);
+  }
+  
+  const result = {
+    checkInDate: checkInDate,
+    checkOutDate: checkOutDate,
+    checkInString: formatDateToString(checkInDate) || formatDateToString(today),
+    checkOutString: formatDateToString(checkOutDate) || formatDateToString(tomorrow)
+  };
+  
+  console.log('Processed date result:', JSON.stringify(result, null, 2));
+  return result;
+}
+
+// Hàm xử lý và phân loại tiện ích
+async function processAmenities(amenityNames) {
+  console.log('Processing amenities input:', amenityNames);
+  
+  if (!amenityNames) {
+    console.log('No amenity names provided');
+    return { roomAmenities: [], hotelAmenities: [] };
+  }
+
+  let amenityArray = [];
+  if (typeof amenityNames === 'string') {
+    amenityArray = [amenityNames];
+  } else if (Array.isArray(amenityNames)) {
+    amenityArray = amenityNames;
+  } else {
+    console.log('Invalid amenity format:', typeof amenityNames);
+    return { roomAmenities: [], hotelAmenities: [] };
+  }
+
+  if (!amenityArray.length) {
+    console.log('Empty amenity array');
+    return { roomAmenities: [], hotelAmenities: [] };
+  }
+
+  try {
+    const amenities = await Amenity.find({
+      name: { 
+        $in: amenityArray.map(name => new RegExp(`^${name}$`, 'i'))
+      }
+    });
+
+    console.log('Found amenities from DB:', amenities.map(a => ({ name: a.name, type: a.type, id: a._id })));
+
+    const roomAmenities = amenities.filter(a => a.type === 'room').map(a => a._id);
+    const hotelAmenities = amenities.filter(a => a.type === 'hotel').map(a => a._id);
+
+    console.log('Processed amenities result:', {
+      input: amenityArray,
+      roomAmenities: roomAmenities.map(id => id.toString()),
+      hotelAmenities: hotelAmenities.map(id => id.toString())
+    });
+
+    return { roomAmenities, hotelAmenities };
+  } catch (error) {
+    console.error('Error processing amenities:', error);
+    return { roomAmenities: [], hotelAmenities: [] };
+  }
+}
+
+// Hàm xây dựng truy vấn phòng
+async function buildRoomQuery(params, amenitiesResult) {
+  const query = {};
+
+  // Xử lý room_type dưới dạng chuỗi hoặc mảng, mặc định là "Standard" nếu không có
+  if (params.room_type) {
+    const roomTypes = Array.isArray(params.room_type) ? params.room_type : [params.room_type];
+    query.roomType = { $in: roomTypes };
+    console.log(`Room types included in query: ${roomTypes.join(', ')}`);
+  } else {
+    query.roomType = { $in: ['Standard'] }; // Mặc định Standard
+    console.log('No room type specified, defaulting to Standard');
+  }
+
+  if (params.capacity) {
+    query.capacity = { $gte: Number(params.capacity) };
+  } else {
+    query.capacity = { $gte: 2 };
+  }
+
+  if (params.bed_type) {
+    query.bedType = params.bed_type;
+  }
+
+  if (amenitiesResult && amenitiesResult.roomAmenities.length) {
+    query.amenities = { $in: amenitiesResult.roomAmenities };
+  }
+
+  if (params.cancellation_policy) {
+    query.cancellationPolicy = params.cancellation_policy;
+  }
+
+  console.log('Built room query:', JSON.stringify(query, null, 2));
+  return query;
+}
+
+// Hàm xây dựng tùy chọn tìm kiếm
+async function buildOptions(params, amenitiesResult) {
+  const options = {
+    sort: params.sort || 'price',
+    skip: params.skip || 0,
+    limit: 10,
+  };
+
+  if (!params.location) {
+    const defaultLocation = await Location.findOne({ name: 'Hà Nội', status: 'active' });
+    if (defaultLocation) {
+      options.locationId = defaultLocation._id;
+      params.location = 'Hà Nội';
+    }
+  } else {
     const location = await Location.findOne({ 
       name: { $regex: params.location, $options: 'i' }, 
       status: 'active' 
     });
     if (location) {
-      query.locationId = location._id;
+      options.locationId = location._id;
     } else {
       throw new Error('Không tìm thấy địa điểm');
     }
   }
 
-  // Lọc theo giá
-  if (params.price_min || params.price_max) {
-    query.lowestPrice = {};
-    if (params.price_min) query.lowestPrice.$gte = Number(params.price_min);
-    if (params.price_max) query.lowestPrice.$lte = Number(params.price_max);
+  if (params.price_range) {
+    const range = params.price_range.toLowerCase();
+    if (range.includes('dưới')) {
+      const max = parseFloat(range.match(/\d+/)[0]) * (range.includes('triệu') ? 1000000 : 1);
+      options.maxPrice = max;
+    } else if (range.includes('từ') && range.includes('đến')) {
+      const [min, max] = range.match(/\d+/g).map(Number);
+      const unit = range.includes('triệu') ? 1000000 : 1;
+      options.minPrice = min * unit;
+      options.maxPrice = max * unit;
+    } else if (range.includes('rẻ')) {
+      options.maxPrice = 1000000;
+    }
+  } else {
+    options.maxPrice = 2000000;
   }
 
-  // Lọc theo tiện ích
-  if (params.amenities && params.amenities.length) {
-    const amenities = await Amenity.find({ 
-      name: { $in: params.amenities }, 
-      type: 'hotel' 
-    });
-    query.amenities = { $all: amenities.map(a => a._id) };
+  if (amenitiesResult) {
+    if (amenitiesResult.roomAmenities.length) {
+      options.roomAmenities = amenitiesResult.roomAmenities;
+    }
+    if (amenitiesResult.hotelAmenities.length) {
+      options.hotelAmenities = amenitiesResult.hotelAmenities;
+    }
   }
 
-  // Lọc theo đánh giá
   if (params.rating) {
-    query.rating = { $gte: Number(params.rating) };
+    options.minRating = Number(params.rating);
   }
 
-  // Lọc theo chính sách (ví dụ: cho phép thú cưng)
-  if (params.pet_policy) {
-    query['policies.petPolicy'] = params.pet_policy;
-  }
-
-  return query;
-}
-
-// Hàm thực thi truy vấn
-async function executeQuery(hotelQuery, params) {
-  // Tìm khách sạn
-  let hotels = await Hotel.find(hotelQuery)
-    .populate('locationId', 'name')
-    .populate('amenities', 'name')
-    .limit(5) // Giới hạn tối đa 5 khách sạn
-    .lean();
-
-  // Lọc phòng nếu có tiêu chí phòng
-  if (params.room_type || params.capacity || params.bed_type || params.room_amenities) {
-    const roomQuery = { status: 'available' };
-
-    if (params.room_type) roomQuery.roomType = params.room_type;
-    if (params.capacity) roomQuery.capacity = { $gte: Number(params.capacity) };
-    if (params.bed_type) roomQuery.bedType = params.bed_type;
-    if (params.room_amenities && params.room_amenities.length) {
-      const amenities = await Amenity.find({ 
-        name: { $in: params.room_amenities }, 
-        type: 'room' 
-      });
-      roomQuery.amenities = { $all: amenities.map(a => a._id) };
-    }
-
-    // Lấy phòng cho mỗi khách sạn
-    hotels = await Promise.all(hotels.map(async (hotel) => {
-      roomQuery.hotelId = hotel._id;
-      const rooms = await Room.find(roomQuery)
-        .populate('amenities', 'name')
-        .lean();
-      return { ...hotel, rooms };
-    }));
-
-    // Lọc khách sạn có phòng phù hợp
-    hotels = hotels.filter(hotel => hotel.rooms && hotel.rooms.length > 0);
-  }
-
-  // Áp dụng voucher nếu có
-  if (params.voucher_code) {
-    const voucher = await Voucher.findOne({ 
-      code: params.voucher_code, 
-      status: 'active',
-      expiryDate: { $gte: new Date() },
-      $or: [{ usageLimit: null }, { usageCount: { $lt: '$usageLimit' } }]
-    });
-    if (voucher) {
-      hotels = hotels.map(hotel => ({
-        ...hotel,
-        rooms: hotel.rooms ? hotel.rooms.map(room => ({
-          ...room,
-          discountedPrice: voucher.calculateDiscount(room.price)
-        })) : []
-      }));
+  if (params.discount) {
+    const discount = params.discount.toLowerCase();
+    if (discount.includes('%')) {
+      const percent = parseFloat(discount.match(/\d+/)[0]);
+      options.minDiscountPercent = percent;
+    } else if (discount.includes('có') || discount.includes('with')) {
+      options.minDiscountPercent = 1;
     }
   }
 
-  // Kiểm tra ngày (giả định phòng trống nếu status là available)
-  if (params.check_in_date && params.check_out_date) {
-    // Trong hệ thống thực tế, cần kiểm tra lịch đặt phòng
-    hotels = hotels.filter(hotel => hotel.rooms && hotel.rooms.length > 0);
-  }
-
-  // Giới hạn 3-5 khách sạn
-  return hotels.slice(0, Math.min(hotels.length, 5)).slice(-Math.max(3, Math.min(hotels.length, 5)));
+  console.log('Built options:', JSON.stringify(options, null, 2));
+  return options;
 }
 
 // Hàm định dạng phản hồi
-function formatResponse(hotels, params) {
-  if (!hotels.length) {
+function formatResponse(hotels, params, dateInfo, amenitiesResult) {
+  if (!hotels || !Array.isArray(hotels) || hotels.length === 0) {
     return {
       fulfillmentResponse: {
         messages: [{
           text: {
-            text: ['Không tìm thấy khách sạn phù hợp với tiêu chí của bạn.']
+            text: ['Không tìm thấy khách sạn phù hợp. Bạn muốn thử loại phòng khác hoặc thay đổi tiêu chí không?']
           }
         }]
-      }
+      },
+      sessionInfo: { parameters: params }
     };
   }
 
-  const messages = hotels.map(hotel => {
-    let text = `${hotel.name} ở ${hotel.locationId.name}, Đánh giá: ${hotel.rating}/5`;
-    if (hotel.rooms && hotel.rooms.length) {
-      text += `\nPhòng trống: ${hotel.rooms.map(r => `${r.name} (${r.roomType}, ${r.discountedPrice ? r.discountedPrice : r.price} VNĐ)`).join(', ')}`;
+  const limitedHotels = hotels.slice(0, Math.min(hotels.length, 5));
+  const { checkInString, checkOutString } = dateInfo;
+  const capacity = params.capacity || 2;
+  // Sử dụng room_type từ params, mặc định là Standard
+  const roomType = params.room_type || 'Standard';
+
+  let roomAmenitiesQuery = '';
+  let hotelAmenitiesQuery = '';
+  if (amenitiesResult) {
+    if (amenitiesResult.roomAmenities.length) {
+      roomAmenitiesQuery = `&roomAmenities=${encodeURIComponent(amenitiesResult.roomAmenities.map(id => id.toString()).join(','))}`;
     }
-    text += `\nXem chi tiết: ${CLIENT_URL}/hoteldetail/${hotel._id}`;
-    return text;
+    if (amenitiesResult.hotelAmenities.length) {
+      hotelAmenitiesQuery = `&hotelAmenities=${encodeURIComponent(amenitiesResult.hotelAmenities.map(id => id.toString()).join(','))}`;
+    }
+  }
+
+  let fullText = `Tìm thấy ${hotels.length} khách sạn tại ${params.location || 'Hà Nội'} có phòng ${roomType}:\n\n`;
+  
+  limitedHotels.forEach((hotel, index) => {
+    const locationName = hotel.locationName || params.location || 'Unknown';
+    fullText += `${index + 1}. ${hotel.name || 'Unknown'} ở ${locationName}\n`;
+    fullText += `   📍 Địa chỉ: ${hotel.address || 'Không có thông tin địa chỉ'}\n`;
+    fullText += `   ⭐ Đánh giá: ${hotel.rating || 0}/5\n`;
+    
+    if (hotel.availableRoomTypes && hotel.availableRoomTypes.length) {
+      fullText += `   🏠 Phòng trống: ${hotel.availableRoomTypes.join(', ')} (${hotel.availableRoomCount} phòng)\n`;
+      fullText += `   💰 Giá từ: ${(hotel.lowestPrice || 0).toLocaleString('vi-VN')} VNĐ\n`;
+    }
+    
+    if (hotel.highestDiscountPercent > 0) {
+      fullText += `   🎉 Giảm giá: ${hotel.highestDiscountPercent}%\n`;
+    }
+    
+    if (hotel.voucherApplied) {
+      fullText += `   🎫 Voucher: ${hotel.voucherApplied}\n`;
+    }
+    
+    // Thêm roomType=Standard vào URL
+    fullText += `   🔗 Chi tiết: ${CLIENT_URL}/hoteldetail/${hotel._id || '684192c2fdacd20a7ef833e2'}?checkIn=${checkInString}&checkOut=${checkOutString}&capacity=${capacity}&roomType=${encodeURIComponent(roomType)}${roomAmenitiesQuery}${hotelAmenitiesQuery}\n\n`;
   });
+
+  fullText += 'Bạn muốn xem thêm hay thay đổi loại phòng không?';
 
   return {
     fulfillmentResponse: {
       messages: [{
         text: {
-          text: [`Tìm thấy ${hotels.length} khách sạn:`, ...messages]
+          text: [fullText]
         }
       }]
     },
-    sessionInfo: {
-      parameters: params // Giữ tham số session
-    }
+    sessionInfo: { parameters: params }
   };
 }
 
 // Controller chính
 exports.handleWebhook = async (req, res) => {
-  const { sessionInfo } = req.body;
-  const params = sessionInfo.parameters;
+  const { sessionInfo, fulfillmentInfo, queryText } = req.body;
+  let params = sessionInfo?.parameters || {};
+
+  console.log('=== WEBHOOK REQUEST ===');
+  console.log('Query:', queryText);
+  console.log('Params received:', JSON.stringify(params, null, 2));
+
+  if (fulfillmentInfo?.tag !== 'HotelSearchWebhook') {
+    console.error('Invalid fulfillment tag:', fulfillmentInfo?.tag);
+    return res.status(400).json({
+      fulfillmentResponse: {
+        messages: [{
+          text: { text: ['Fulfillment tag không hợp lệ.'] }
+        }]
+      }
+    });
+  }
+
+  const apiKey = req.headers['x-webhook-api-key'];
+  if (apiKey !== process.env.WEBHOOK_API_KEY) {
+    console.error('Invalid API key');
+    return res.status(401).json({
+      fulfillmentResponse: {
+        messages: [{
+          text: { text: ['Yêu cầu không được xác thực.'] }
+        }]
+      }
+    });
+  }
 
   try {
-    const query = await buildQuery(params);
-    const results = await executeQuery(query, params);
-    const response = formatResponse(results, params);
+    const dateInfo = processDateInputs(params);
+    let amenitiesResult = null;
+    if (params.amenity) {
+      amenitiesResult = await processAmenities(params.amenity);
+    }
+
+    const roomQuery = await buildRoomQuery(params, amenitiesResult);
+    const options = await buildOptions(params, amenitiesResult);
+
+    const hotels = await findAvailableRooms(roomQuery, dateInfo.checkInDate, dateInfo.checkOutDate, options);
+
+    if (params.voucher_code) {
+      const lowestPrice = hotels.length > 0 ? Math.min(...hotels.map(h => h.lowestPrice || 0)) : 0;
+      const voucherResult = await validateVoucher(
+        params.voucher_code,
+        lowestPrice,
+        dateInfo.checkInDate,
+        params.user_tier || 'Bronze',
+        params.user_id || null,
+        new Date()
+      );
+
+      if (voucherResult.success && voucherResult.voucher) {
+        hotels.forEach(hotel => {
+          hotel.lowestDiscountedPrice = Math.max(0, (hotel.lowestPrice || 0) - voucherResult.discountAmount);
+          hotel.voucherApplied = params.voucher_code;
+        });
+      } else if (!voucherResult.success) {
+        hotels.push({
+          _id: 'voucher_error',
+          name: 'Thông báo về voucher',
+          message: voucherResult.message
+        });
+      }
+    }
+
+    const response = formatResponse(hotels, params, dateInfo, amenitiesResult);
+    console.log('=== WEBHOOK RESPONSE ===');
+    console.log('Hotels found:', hotels.length);
+    console.log('Response sent:', JSON.stringify(response, null, 2));
     res.json(response);
   } catch (error) {
-    console.error('Lỗi webhook:', error);
+    console.error('Webhook error:', error);
     res.json({
       fulfillmentResponse: {
         messages: [{
-          text: {
-            text: ['Xin lỗi, có lỗi xảy ra. Vui lòng thử lại.']
-          }
+          text: { text: ['Xin lỗi, có lỗi xảy ra: ' + error.message] }
         }]
       }
     });

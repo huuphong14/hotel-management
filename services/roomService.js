@@ -129,6 +129,8 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
     roomQuery.amenities = { $in: roomAmenities.map(id => new mongoose.Types.ObjectId(id)) };
   }
 
+  console.log("Final roomQuery before aggregation:", roomQuery);
+
   // 3. Xây dựng pipeline aggregation
   const pipeline = [
     { $match: roomQuery },
@@ -269,6 +271,7 @@ async function findAvailableRooms(query, checkIn, checkOut, options = {}) {
       roomsWithAmenities: {
         $push: {
           roomId: '$_id',
+          roomType: '$roomType', // Thêm roomType vào đây
           amenities: '$amenities._id'
         }
       }

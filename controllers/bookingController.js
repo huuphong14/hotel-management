@@ -274,6 +274,11 @@ exports.createBooking = async (req, res) => {
     // Increment voucher usage if applicable
     if (voucherValidation.voucher) {
       voucherValidation.voucher.usageCount += 1;
+      // Thêm userId vào mảng usedBy
+      voucherValidation.voucher.usedBy = voucherValidation.voucher.usedBy || [];
+      if (!voucherValidation.voucher.usedBy.includes(req.user.id)) {
+        voucherValidation.voucher.usedBy.push(req.user.id);
+      }
       if (
         voucherValidation.voucher.usageLimit &&
         voucherValidation.voucher.usageCount >=
@@ -303,21 +308,21 @@ exports.createBooking = async (req, res) => {
       paymentMethod === "zalopay"
         ? "ZaloPay"
         : paymentMethod === "vnpay"
-        ? "VNPay"
-        : paymentMethod === "credit_card"
-        ? "Thẻ tín dụng"
-        : "PayPal";
+          ? "VNPay"
+          : paymentMethod === "credit_card"
+            ? "Thẻ tín dụng"
+            : "PayPal";
 
     // Function to create email content
     const createEmailContent = (isForBooker = true) => {
       const recipientInfo = isForBooker ? contactInfo : guestInfo;
       const recipientName = recipientInfo.name;
-      
+
       return `
         <h1>${isForBooker ? "Xác nhận đặt phòng" : "Thông báo đặt phòng"}</h1>
-        ${isForBooker 
+        ${isForBooker
           ? `<p>Chào ${recipientName},</p>
-             <p>Cảm ơn bạn đã đặt phòng ${bookingFor === "other" ? "cho " + guestInfo.name : ""} tại khách sạn của chúng tôi.</p>` 
+             <p>Cảm ơn bạn đã đặt phòng ${bookingFor === "other" ? "cho " + guestInfo.name : ""} tại khách sạn của chúng tôi.</p>`
           : `<p>Chào ${recipientName},</p>
              <p>Bạn có một đặt phòng được thực hiện bởi ${contactInfo.name}. Dưới đây là thông tin chi tiết:</p>`
         }
@@ -395,7 +400,7 @@ exports.createBooking = async (req, res) => {
       booker: { sent: false, error: null },
       guest: { sent: false, error: null }
     };
-    
+
     try {
       // Gửi email xác nhận đặt phòng cho người đặt phòng
       console.log(`Attempting to send booking confirmation email to booker: ${contactInfo.email}`);
@@ -432,7 +437,7 @@ exports.createBooking = async (req, res) => {
       // Chờ tất cả email được gửi
       await Promise.allSettled(emailPromises);
       console.log("Email sending process completed", emailResults);
-      
+
     } catch (emailError) {
       console.error("Error in email sending process:", emailError.message, emailError.stack);
     }
@@ -1951,10 +1956,10 @@ exports.getMyHotelBookings = async (req, res) => {
 };
 exports.cancelExpiredBookings = async () => {
   console.log("=== BẮT ĐẦU KIỂM TRA VÀ HỦY BOOKING QUÁ HẠN ===");
-  
+
   const session = await mongoose.startSession();
   let transactionStarted = false;
-  
+
   try {
     // Bước 1: Tìm booking cần hủy TRƯỚC KHI bắt đầu transaction
     const timeoutMinutes = 30;
@@ -2004,10 +2009,10 @@ exports.cancelExpiredBookings = async () => {
     for (const bookingData of unpaidBookings) {
       try {
         console.log(`Đang xử lý booking ${bookingData._id}...`);
-        
+
         // ✅ TÌM LẠI BOOKING TRONG TRANSACTION ĐỂ ĐẢM BẢO TÍNH NHẤT QUÁN
         const booking = await Booking.findById(bookingData._id).session(session);
-        
+
         if (!booking) {
           console.log(`Booking ${bookingData._id} không tồn tại, bỏ qua`);
           continue;
@@ -2025,7 +2030,7 @@ exports.cancelExpiredBookings = async () => {
           {
             $set: {
               status: "cancelled",
-              paymentStatus: "cancelled", 
+              paymentStatus: "cancelled",
               cancelledAt: new Date(),
               cancellationReason: "auto_timeout_unpaid"
             }
@@ -2078,7 +2083,7 @@ exports.cancelExpiredBookings = async () => {
     }
 
     console.log("=== HOÀN TẤT KIỂM TRA VÀ HỦY BOOKING QUÁ HẠN ===");
-    
+
     return {
       processedCount,
       totalFound: unpaidBookings.length,
@@ -2088,7 +2093,7 @@ exports.cancelExpiredBookings = async () => {
 
   } catch (error) {
     console.error(`❌ Lỗi nghiêm trọng trong cancelExpiredBookings:`, error.message);
-    
+
     // Chỉ abort nếu transaction đã bắt đầu
     if (transactionStarted) {
       try {
@@ -2098,7 +2103,7 @@ exports.cancelExpiredBookings = async () => {
         console.error("Lỗi khi abort transaction:", abortError.message);
       }
     }
-    
+
     throw error;
   } finally {
     await session.endSession();
@@ -2108,7 +2113,7 @@ exports.cancelExpiredBookings = async () => {
 // 2. HÀM GỬI EMAIL TÁCH RIÊNG (CHẠY NGOÀI TRANSACTION)
 async function sendEmailNotifications(cancelledBookings) {
   console.log(`Gửi ${cancelledBookings.length} email thông báo hủy booking...`);
-  
+
   for (const bookingData of cancelledBookings) {
     try {
       const hotelName = bookingData.room?.hotelId?.name || "Khách sạn không xác định";
@@ -2133,12 +2138,12 @@ async function sendEmailNotifications(cancelledBookings) {
         subject: `Hủy đặt phòng tự động - Mã: ${bookingData._id.toString().slice(-8)}`,
         message,
       });
-      
+
       console.log(`📧 Đã gửi email tới ${bookingData.user.email}`);
-      
+
       // Delay nhỏ giữa các email để tránh spam
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
     } catch (emailError) {
       console.error(`❌ Lỗi gửi email cho ${bookingData.user.email}:`, emailError.message);
     }

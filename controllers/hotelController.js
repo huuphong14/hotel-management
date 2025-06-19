@@ -1022,15 +1022,14 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       maxPrice,
       minRating,
       maxRating,
-      roomTypes,
-      roomAmenities, // Tham số mới cho tiện nghi phòng
-      hotelAmenities, // Tham số mới cho tiện nghi khách sạn
-      sort = "price",
+      roomType, 
+      roomAmenities,
+      hotelAmenities,
+      sort = 'price',
       page = 1,
       limit = 10,
     } = req.query;
 
-    // Validate sort parameter
     const validSorts = [
       "price",
       "-price",
@@ -1048,7 +1047,6 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       });
     }
 
-    // Validate input
     if (!locationName || !checkIn || !checkOut || !capacity) {
       return res.status(400).json({
         success: false,
@@ -1057,7 +1055,6 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       });
     }
 
-    // Validate rating range if provided
     if (minRating && (isNaN(minRating) || minRating < 0 || minRating > 5)) {
       return res.status(400).json({
         success: false,
@@ -1077,10 +1074,11 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       });
     }
 
-    // Validate room types if provided
     let roomTypesArray = [];
-    if (roomTypes) {
-      roomTypesArray = roomTypes.split(",").map((type) => type.trim());
+    const roomTypeParam = roomType 
+    
+    if (roomTypeParam) {
+      roomTypesArray = roomTypeParam.split(",").map((type) => type.trim());
       const validRoomTypes = [
         "Standard",
         "Superior",
@@ -1100,8 +1098,8 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
         });
       }
     }
+    console.log("Parsed Room Types:", roomTypesArray);
 
-    // Validate room amenities if provided
     let roomAmenityIds = [];
     if (roomAmenities) {
       roomAmenityIds = roomAmenities.split(",").map((id) => id.trim());
@@ -1114,7 +1112,6 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
     }
     console.log("Parsed Room Amenities:", roomAmenityIds);
 
-    // Validate hotel amenities if provided
     let hotelAmenityIds = [];
     if (hotelAmenities) {
       hotelAmenityIds = hotelAmenities.split(",").map((id) => id.trim());
@@ -1153,14 +1150,20 @@ exports.searchHotelsWithAvailableRooms = async (req, res) => {
       });
     }
 
+    // Xây dựng room query với điều kiện lọc roomType
     const roomQuery = {
       capacity: { $gte: Number(capacity) },
-      status: "available",
     };
 
+    // Thêm điều kiện lọc roomType vào roomQuery
     if (roomTypesArray.length > 0) {
       roomQuery.roomType = { $in: roomTypesArray };
+      console.log("Added roomType filter:", { $in: roomTypesArray });
+    } else {
+      console.log("No roomType filter applied - roomTypesArray is empty");
     }
+
+    console.log("Final Room Query before calling service:", roomQuery);
 
     const hotels = await RoomService.findAvailableRooms(
       roomQuery,

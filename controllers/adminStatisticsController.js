@@ -347,6 +347,7 @@ exports.getTopHotelsByBookings = asyncHandler(async (req, res) => {
   const topHotels = await Booking.aggregate([
     {
       $match: {
+        status: { $in: ["confirmed", "completed"] },
         room: { $in: await Room.find().distinct("_id") },
         ...dateMatch,
       },
@@ -458,6 +459,7 @@ exports.getTopUsersByBookings = asyncHandler(async (req, res) => {
     {
       $match: {
         ...dateMatch,
+        status: { $in: ["confirmed", "completed"] },
       },
     },
     {
