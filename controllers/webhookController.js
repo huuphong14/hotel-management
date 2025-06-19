@@ -8,11 +8,13 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 // Hàm chuyển đổi {year, month, day} thành Date object
 function parseDateObject(dateObj) {
   if (dateObj && typeof dateObj === 'object' && dateObj.year && dateObj.month && dateObj.day) {
-    return new Date(dateObj.year, dateObj.month - 1, dateObj.day);
+    // Tạo Date object với giờ 00:00:00 theo múi giờ địa phương (+07:00)
+    const date = new Date(dateObj.year, dateObj.month - 1, dateObj.day, 0, 0, 0);
+    // Chuyển về UTC để lưu trữ
+    return new Date(Date.UTC(dateObj.year, dateObj.month - 1, dateObj.day));
   }
   return null;
 }
-
 // Hàm chuyển đổi Date object thành chuỗi YYYY-MM-DD
 function formatDateToString(date) {
   if (!date || !(date instanceof Date) || isNaN(date.getTime())) return null;
@@ -33,7 +35,7 @@ function processDateInputs(params) {
   }, null, 2));
 
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0); // Chuẩn hóa today theo UTC
   const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
   
   let checkInDate = null;
@@ -53,6 +55,9 @@ function processDateInputs(params) {
       checkInDate = new Date(params.check_in_date);
       if (isNaN(checkInDate.getTime())) {
         checkInDate = null;
+      } else {
+        // Chuẩn hóa về UTC
+        checkInDate = new Date(Date.UTC(checkInDate.getUTCFullYear(), checkInDate.getUTCMonth(), checkInDate.getUTCDate()));
       }
     } else if (params.date) {
       if (typeof params.date === 'object') {
@@ -61,6 +66,8 @@ function processDateInputs(params) {
         checkInDate = new Date(params.date);
         if (isNaN(checkInDate.getTime())) {
           checkInDate = null;
+        } else {
+          checkInDate = new Date(Date.UTC(checkInDate.getUTCFullYear(), checkInDate.getUTCMonth(), checkInDate.getUTCDate()));
         }
       }
     }
@@ -70,6 +77,8 @@ function processDateInputs(params) {
     checkOutDate = new Date(params.check_out_date);
     if (isNaN(checkOutDate.getTime())) {
       checkOutDate = null;
+    } else {
+      checkOutDate = new Date(Date.UTC(checkOutDate.getUTCFullYear(), checkOutDate.getUTCMonth(), checkOutDate.getUTCDate()));
     }
   }
   
@@ -148,14 +157,13 @@ async function processAmenities(amenityNames) {
 async function buildRoomQuery(params, amenitiesResult) {
   const query = {};
 
-  // Xử lý room_type dưới dạng chuỗi hoặc mảng, mặc định là "Standard" nếu không có
+  // Xử lý room_type dưới dạng chuỗi hoặc mảng, không đặt mặc định nếu không có
   if (params.room_type) {
     const roomTypes = Array.isArray(params.room_type) ? params.room_type : [params.room_type];
     query.roomType = { $in: roomTypes };
     console.log(`Room types included in query: ${roomTypes.join(', ')}`);
   } else {
-    query.roomType = { $in: ['Standard'] }; // Mặc định Standard
-    console.log('No room type specified, defaulting to Standard');
+    console.log('No room type specified, skipping room type filter');
   }
 
   if (params.capacity) {
@@ -268,8 +276,8 @@ function formatResponse(hotels, params, dateInfo, amenitiesResult) {
   const limitedHotels = hotels.slice(0, Math.min(hotels.length, 5));
   const { checkInString, checkOutString } = dateInfo;
   const capacity = params.capacity || 2;
-  // Sử dụng room_type từ params, mặc định là Standard
-  const roomType = params.room_type || 'Standard';
+  // Sử dụng room_type từ params, không đặt mặc định ở đây
+  const roomType = params.room_type 
 
   let roomAmenitiesQuery = '';
   let hotelAmenitiesQuery = '';
@@ -282,7 +290,7 @@ function formatResponse(hotels, params, dateInfo, amenitiesResult) {
     }
   }
 
-  let fullText = `Tìm thấy ${hotels.length} khách sạn tại ${params.location || 'Hà Nội'} có phòng ${roomType}:\n\n`;
+  let fullText = `Tìm thấy ${hotels.length} khách sạn tại ${params.location || 'Hà Nội'} có phòng:\n\n`;
   
   limitedHotels.forEach((hotel, index) => {
     const locationName = hotel.locationName || params.location || 'Unknown';
@@ -303,7 +311,6 @@ function formatResponse(hotels, params, dateInfo, amenitiesResult) {
       fullText += `   🎫 Voucher: ${hotel.voucherApplied}\n`;
     }
     
-    // Thêm roomType=Standard vào URL
     fullText += `   🔗 Chi tiết: ${CLIENT_URL}/hoteldetail/${hotel._id || '684192c2fdacd20a7ef833e2'}?checkIn=${checkInString}&checkOut=${checkOutString}&capacity=${capacity}&roomType=${encodeURIComponent(roomType)}${roomAmenitiesQuery}${hotelAmenitiesQuery}\n\n`;
   });
 

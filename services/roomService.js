@@ -746,23 +746,69 @@ async function getAvailableRoomsByHotel(hotelId, query, checkIn, checkOut, optio
         as: 'amenitiesDetails'
       }
     },
-    // Add price range filter if specified
+    // ADD DISCOUNT CALCULATION - This was missing!
+    {
+      $addFields: {
+        hasValidDiscount: {
+          $and: [
+            { $gt: ['$discountPercent', 0] },
+            { $ne: ['$discountStartDate', null] },
+            { $ne: ['$discountEndDate', null] },
+            { $lte: ['$discountStartDate', checkIn] },
+            { $gte: ['$discountEndDate', checkIn] }
+          ]
+        }
+      }
+    },
+    {
+      $addFields: {
+        discountedPrice: {
+          $cond: {
+            if: '$hasValidDiscount',
+            then: {
+              $round: [
+                {
+                  $multiply: [
+                    '$price',
+                    { $subtract: [1, { $divide: ['$discountPercent', 100] }] }
+                  ]
+                },
+                0
+              ]
+            },
+            else: '$price'
+          }
+        },
+        currentDiscountPercent: {
+          $cond: {
+            if: '$hasValidDiscount',
+            then: '$discountPercent',
+            else: 0
+          }
+        }
+      }
+    },
+    // Add price range filter if specified (use discountedPrice now)
     ...(minPrice || maxPrice ? [{
       $match: {
-        price: {
+        discountedPrice: {
           ...(minPrice && { $gte: Number(minPrice) }),
           ...(maxPrice && { $lte: Number(maxPrice) })
         }
       }
     }] : []),
-    // Sort
+    // Sort (update to handle discounted price)
     {
       $sort: {
-        ...(sort === 'price' || sort === 'price-asc' ? { price: 1 } :
-          sort === 'price-desc' ? { price: -1 } :
-            sort === 'capacity' || sort === 'capacity-asc' ? { capacity: 1 } :
-              sort === 'capacity-desc' ? { capacity: -1 } :
-                { price: 1 }) // Default sort by price ascending
+        ...(sort === 'price' || sort === '-price' ? 
+          { discountedPrice: sort === '-price' ? -1 : 1 } :
+          sort === 'capacity' || sort === '-capacity' ? 
+            { capacity: sort === '-capacity' ? -1 : 1 } :
+            sort === 'roomType' || sort === '-roomType' ? 
+              { roomType: sort === '-roomType' ? -1 : 1 } :
+              sort === 'highestDiscountPercent' || sort === '-highestDiscountPercent' ?
+                { currentDiscountPercent: sort === '-highestDiscountPercent' ? -1 : 1 } :
+                { discountedPrice: 1 }) // Default sort by discounted price ascending
       }
     },
     // Paginate

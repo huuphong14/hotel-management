@@ -57,29 +57,76 @@ exports.createReview = async (req, res) => {
     }
 
     // Kiểm tra xem người dùng có đặt phòng hoàn thành tại khách sạn này chưa
-    const hasBooking = await Booking.findOne({
+    const userBookings = await Booking.find({
       user: req.user.id,
-      status: "completed",
     }).populate({
       path: "room",
       select: "hotelId",
       match: { hotelId: hotelId },
     });
 
-    if (!hasBooking || !hasBooking.room) {
+    // Lọc ra các đặt phòng thuộc về khách sạn này
+    const hotelBookings = userBookings.filter((booking) => booking.room);
+
+    if (hotelBookings.length === 0) {
       console.warn(
-        `Không tìm thấy đặt phòng hoàn thành cho người dùng: ${req.user.id} tại khách sạn: ${hotelId}`
+        `Không tìm thấy đặt phòng nào cho người dùng: ${req.user.id} tại khách sạn: ${hotelId}`
       );
       return res.status(400).json({
         success: false,
-        message:
-          "Bạn cần đặt phòng và hoàn thành lưu trú tại khách sạn trước khi đánh giá",
+        message: "Bạn cần đặt phòng tại khách sạn trước khi đánh giá",
       });
+    }
+
+    // Kiểm tra trạng thái các đặt phòng
+    const hasCompletedBooking = hotelBookings.some(
+      (booking) => booking.status === "completed"
+    );
+    const hasCancelledBooking = hotelBookings.some(
+      (booking) => booking.status === "cancelled"
+    );
+    const hasPendingBooking = hotelBookings.some(
+      (booking) => booking.status === "pending"
+    );
+    const hasConfirmedBooking = hotelBookings.some(
+      (booking) => booking.status === "confirmed"
+    );
+
+    // Chỉ cho phép đánh giá nếu có ít nhất một đặt phòng hoàn thành
+    if (!hasCompletedBooking) {
+      console.warn(
+        `Người dùng: ${
+          req.user.id
+        } chưa có đặt phòng hoàn thành tại khách sạn: ${hotelId}. Trạng thái đặt phòng: ${hotelBookings
+          .map((b) => b.status)
+          .join(", ")}`
+      );
+
+      let message =
+        "Bạn cần hoàn thành lưu trú tại khách sạn trước khi đánh giá";
+
+      if (hasPendingBooking) {
+        message += ". Bạn có đặt phòng đang chờ xác nhận";
+      } else if (hasConfirmedBooking) {
+        message += ". Bạn có đặt phòng đã được xác nhận nhưng chưa hoàn thành";
+      }
+
+      return res.status(400).json({
+        success: false,
+        message,
+      });
+    }
+
+    // Nếu có đặt phòng bị hủy, thông báo nhưng vẫn cho phép đánh giá nếu có đặt phòng hoàn thành
+    if (hasCancelledBooking) {
+      console.log(
+        `Người dùng: ${req.user.id} có đặt phòng bị hủy tại khách sạn: ${hotelId}, nhưng vẫn có đặt phòng hoàn thành`
+      );
     }
 
     // Kiểm tra xem người dùng đã đánh giá khách sạn này chưa
     const existingReview = await Review.findOne({
-      userId: req.user.id,
+userId: req.user.id,
       hotelId,
     });
     if (existingReview) {
@@ -123,6 +170,7 @@ exports.createReview = async (req, res) => {
     });
   }
 };
+
 
 /**
  * @swagger
