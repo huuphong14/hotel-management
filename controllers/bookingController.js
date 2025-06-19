@@ -94,6 +94,8 @@ const { recordRetryFailure } = require("../utils/monitoring");
  *       500:
  *         description: "Lỗi server"
  */
+
+
 exports.createBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -225,19 +227,40 @@ exports.createBooking = async (req, res) => {
       });
     }
 
-    // Calculate original price
+    // Calculate room price with discount
+    const roomPriceInfo = calculateRoomPrice(room, checkInDate);
     const numberOfDays = Math.ceil(
       (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
     );
-    const originalPrice = room.price * numberOfDays;
+    
+    // Tính toán giá phòng
+    const roomOriginalPrice = room.price * numberOfDays; // Giá gốc không giảm
+    const roomDiscountAmount = roomPriceInfo.discountAmountPerNight * numberOfDays; // Tổng tiền giảm giá phòng
+    const originalPrice = roomPriceInfo.pricePerNight * numberOfDays; // Giá sau giảm giá phòng
 
-    // Validate voucher
+    // Log để debug
+    console.log("Price calculation:", {
+      basePrice: room.price,
+      discountPercent: room.discountPercent,
+      discountStartDate: room.discountStartDate,
+      discountEndDate: room.discountEndDate,
+      checkInDate: checkInDate,
+      isDiscounted: roomPriceInfo.isDiscounted,
+      finalPricePerNight: roomPriceInfo.pricePerNight,
+      numberOfDays: numberOfDays,
+      roomOriginalPrice: roomOriginalPrice,
+      roomDiscountAmount: roomDiscountAmount,
+      originalPrice: originalPrice
+    });
+
+    // Validate voucher (voucher sẽ được áp dụng lên originalPrice đã tính giảm giá phòng)
     const voucherValidation = await validateVoucher(
       voucherId,
       originalPrice,
       checkInDate,
       user.tier
     );
+    
     if (!voucherValidation.success) {
       await session.abortTransaction();
       session.endSession();
@@ -258,14 +281,17 @@ exports.createBooking = async (req, res) => {
       specialRequests,
       checkIn: checkInDate,
       checkOut: checkOutDate,
-      originalPrice,
+      roomOriginalPrice, // Giá gốc phòng (không giảm giá)
+      roomDiscountPercent: roomPriceInfo.isDiscounted ? roomPriceInfo.discountPercent : 0,
+      roomDiscountAmount, // Tổng tiền giảm giá phòng
+      originalPrice, // Giá sau khi áp dụng giảm giá phòng
       status: "pending",
       paymentMethod,
       voucher: voucherValidation.voucher
         ? voucherValidation.voucher._id
         : undefined,
-      discountAmount: voucherValidation.discountAmount,
-      finalPrice: originalPrice - voucherValidation.discountAmount,
+      discountAmount: voucherValidation.discountAmount, // Giảm giá từ voucher
+      finalPrice: originalPrice - voucherValidation.discountAmount, // Giá cuối cùng
     };
 
     // Create booking
@@ -337,10 +363,12 @@ exports.createBooking = async (req, res) => {
           <li>Ngày check-out: ${new Date(booking.checkOut).toLocaleDateString("vi-VN")} (12:00)</li>
           <li>Số đêm: ${numberOfDays}</li>
           ${isForBooker ? `
-          <li>Giá gốc: ${booking.originalPrice.toLocaleString("vi-VN")}đ</li>
+          <li>Giá phòng gốc: ${roomOriginalPrice.toLocaleString("vi-VN")}đ</li>
+          ${roomDiscountAmount > 0 ? `<li>Giảm giá phòng (${roomPriceInfo.discountPercent}%): -${roomDiscountAmount.toLocaleString("vi-VN")}đ</li>` : ""}
+          <li>Giá phòng sau giảm giá: ${booking.originalPrice.toLocaleString("vi-VN")}đ</li>
           ${booking.voucher ? `<li>Mã giảm giá: ${booking.voucher.code}</li>` : ""}
-          ${booking.discountAmount > 0 ? `<li>Giảm giá: ${booking.discountAmount.toLocaleString("vi-VN")}đ</li>` : ""}
-          <li>Tổng thanh toán: ${booking.finalPrice.toLocaleString("vi-VN")}đ</li>
+          ${booking.discountAmount > 0 ? `<li>Giảm giá voucher: -${booking.discountAmount.toLocaleString("vi-VN")}đ</li>` : ""}
+          <li><strong>Tổng thanh toán: ${booking.finalPrice.toLocaleString("vi-VN")}đ</strong></li>
           <li>Phương thức thanh toán: ${formattedPaymentMethod}</li>
           ` : `<li>Tổng chi phí: ${booking.finalPrice.toLocaleString("vi-VN")}đ</li>`}
         </ul>
@@ -379,6 +407,7 @@ exports.createBooking = async (req, res) => {
           <li>Vui lòng mang theo giấy tờ tùy thân khi check-in</li>
           <li>Check-in: 14:00 | Check-out: 12:00</li>
           <li>Nếu có thắc mắc, vui lòng liên hệ với chúng tôi</li>
+          ${roomDiscountAmount > 0 ? `<li>Bạn đã tiết kiệm ${roomDiscountAmount.toLocaleString("vi-VN")}đ nhờ ưu đãi phòng!</li>` : ""}
         </ul>
         ` : `
         <h2>Hướng dẫn check-in:</h2>
@@ -458,6 +487,15 @@ exports.createBooking = async (req, res) => {
       data: booking,
       paymentUrl: paymentUrl.payUrl,
       transactionId: paymentUrl.transactionId,
+      priceBreakdown: {
+        roomOriginalPrice,
+        roomDiscountAmount,
+        roomDiscountPercent: roomPriceInfo.discountPercent,
+        priceAfterRoomDiscount: originalPrice,
+        voucherDiscountAmount: voucherValidation.discountAmount,
+        finalPrice: booking.finalPrice,
+        numberOfDays
+      },
       emailStatus: {
         booker: {
           sent: emailResults.booker.sent,
@@ -478,6 +516,37 @@ exports.createBooking = async (req, res) => {
       message: "Lỗi server",
     });
   }
+};
+
+const calculateRoomPrice = (room, checkInDate) => {
+  const checkIn = new Date(checkInDate);
+  
+  // Kiểm tra xem phòng có đang trong thời gian giảm giá không
+  if (room.discountPercent > 0 && 
+      room.discountStartDate && 
+      room.discountEndDate) {
+    
+    const discountStart = new Date(room.discountStartDate);
+    const discountEnd = new Date(room.discountEndDate);
+    
+    // Kiểm tra xem ngày check-in có nằm trong thời gian giảm giá không
+    if (checkIn >= discountStart && checkIn <= discountEnd) {
+      const discountAmount = (room.price * room.discountPercent) / 100;
+      return {
+        pricePerNight: room.price - discountAmount,
+        isDiscounted: true,
+        discountPercent: room.discountPercent,
+        discountAmountPerNight: discountAmount
+      };
+    }
+  }
+  
+  return {
+    pricePerNight: room.price,
+    isDiscounted: false,
+    discountPercent: 0,
+    discountAmountPerNight: 0
+  };
 };
 
 function validateHotelData(room) {
