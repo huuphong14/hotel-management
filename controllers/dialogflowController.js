@@ -1,5 +1,6 @@
 const { SessionsClient } = require("@google-cloud/dialogflow-cx");
 const DialogflowConfig = require("../config/dialogflow");
+const hotelSearchService = require('../services/hotelSearchService');
 
 class DialogflowController {
   constructor() {
@@ -45,7 +46,22 @@ class DialogflowController {
       };
 
       const [response] = await this.sessionsClient.detectIntent(request);
-      return this.formatResponse(response);
+      const formatted = this.formatResponse(response);
+
+      // Nếu intent là SearchHotels thì gọi hotelSearchService
+      if (formatted.intent === 'SearchHotels') {
+        // Lấy parameters từ Dialogflow
+        const params = formatted.parameters?.fields || {};
+        // Xử lý tìm kiếm khách sạn
+        const hotelResult = await hotelSearchService.formatHotelSearchResponse(params);
+        return {
+          ...hotelResult,
+          intent: formatted.intent,
+          parameters: formatted.parameters,
+        };
+      }
+      // Nếu không phải intent SearchHotels thì trả về như cũ
+      return formatted;
     } catch (error) {
       console.error("Error sending text message:", error.message);
       throw new Error("Dialogflow API error");

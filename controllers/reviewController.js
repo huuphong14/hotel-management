@@ -126,7 +126,7 @@ exports.createReview = async (req, res) => {
 
     // Kiểm tra xem người dùng đã đánh giá khách sạn này chưa
     const existingReview = await Review.findOne({
-userId: req.user.id,
+      userId: req.user.id,
       hotelId,
     });
     if (existingReview) {
@@ -153,7 +153,13 @@ userId: req.user.id,
     await review.populate({ path: "userId", select: "name" });
 
     // Cập nhật điểm trung bình và số lượng đánh giá của khách sạn
-    await Review.calculateAverageRating(hotelId);
+    // Middleware post('save') sẽ tự động gọi calculateAverageRating
+    // Nhưng chúng ta có thể gọi thêm để đảm bảo
+    try {
+      await Review.calculateAverageRating(hotelId);
+    } catch (error) {
+      console.error('Error updating hotel rating:', error);
+    }
 
     console.log(
       `Tạo đánh giá thành công cho khách sạn: ${hotelId} bởi người dùng: ${req.user.id}`
@@ -170,7 +176,6 @@ userId: req.user.id,
     });
   }
 };
-
 
 /**
  * @swagger
@@ -308,6 +313,9 @@ exports.updateReview = async (req, res) => {
       });
     }
 
+    // Lưu hotelId trước khi cập nhật
+    const hotelId = review.hotelId;
+
     // Cập nhật thông tin đánh giá
     review = await Review.findByIdAndUpdate(
       req.params.id,
@@ -324,7 +332,11 @@ exports.updateReview = async (req, res) => {
     );
 
     // Cập nhật điểm trung bình và số lượng đánh giá
-    await Review.calculateAverageRating(review.hotelId);
+    try {
+      await Review.calculateAverageRating(hotelId);
+    } catch (error) {
+      console.error('Error updating hotel rating after review update:', error);
+    }
 
     console.log(
       `Cập nhật đánh giá ${req.params.id} thành công bởi người dùng: ${req.user.id}`
@@ -477,11 +489,20 @@ exports.deleteReview = async (req, res) => {
       });
     }
 
+    // Lưu hotelId trước khi xóa
+    const hotelId = review.hotelId;
+
     // Xóa đánh giá
     await review.deleteOne();
 
     // Cập nhật điểm trung bình và số lượng đánh giá
-    await Review.calculateAverageRating(review.hotelId);
+    // Middleware post('deleteOne') sẽ tự động gọi calculateAverageRating
+    // Nhưng chúng ta có thể gọi thêm để đảm bảo
+    try {
+      await Review.calculateAverageRating(hotelId);
+    } catch (error) {
+      console.error('Error updating hotel rating after review deletion:', error);
+    }
 
     console.log(`Xóa đánh giá với ID: ${req.params.id} thành công`);
 
