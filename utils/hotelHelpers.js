@@ -1,18 +1,30 @@
-const Hotel = require('../models/Hotel');
+const mongoose = require('mongoose');
 const Room = require('../models/Room');
+const Hotel = require('../models/Hotel');
+const { getBookedRoomIds } = require('../services/roomService');
 
-exports.updateHotelLowestPrice = async (hotelId) => {
+exports.updateHotelLowestPrice = async (hotelId, checkIn, checkOut) => {
   try {
     const currentDate = new Date();
+    // Sử dụng checkIn/checkOut từ tham số, hoặc mặc định 30 ngày
+    const startDate = checkIn || currentDate;
+    const endDate = checkOut || new Date(currentDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // Sử dụng aggregation pipeline để tính toán giá
+    // Lấy danh sách ID phòng đã được đặt
+    const bookedRoomIds = await getBookedRoomIds(startDate, endDate);
+    console.log(`Booked room IDs for hotel ${hotelId}:`, bookedRoomIds);
+
+    // Aggregation pipeline
     const roomStats = await Room.aggregate([
+      // Lọc các phòng khả dụng và không bị đặt
       {
         $match: {
-          hotelId: hotelId,
+          hotelId: new mongoose.Types.ObjectId(hotelId),
           status: 'available',
+          _id: { $nin: bookedRoomIds.map(id => new mongoose.Types.ObjectId(id)) },
         },
       },
+      // Tính toán giá sau giảm và phần trăm giảm giá
       {
         $project: {
           price: 1,
@@ -50,12 +62,23 @@ exports.updateHotelLowestPrice = async (hotelId) => {
           },
         },
       },
+      // Sắp xếp theo discountPercent giảm dần để lấy phòng có giảm giá cao nhất
+      {
+        $sort: {
+          discountPercent: -1,
+        },
+      },
+      // Giới hạn chỉ lấy 1 phòng (phòng có discountPercent cao nhất)
+      {
+        $limit: 1,
+      },
+      // Nhóm để trả về các giá trị cần thiết
       {
         $group: {
           _id: null,
-          lowestPrice: { $min: '$price' },
-          lowestDiscountedPrice: { $min: '$discountedPrice' },
-          highestDiscountPercent: { $max: '$discountPercent' },
+          lowestPrice: { $first: '$price' },
+          lowestDiscountedPrice: { $first: '$discountedPrice' },
+          highestDiscountPercent: { $first: '$discountPercent' },
         },
       },
     ]);
@@ -75,7 +98,6 @@ exports.updateHotelLowestPrice = async (hotelId) => {
 
     await Hotel.findByIdAndUpdate(hotelId, updateData);
     console.log(`Đã cập nhật giá cho khách sạn ${hotelId}:`, updateData);
-
   } catch (error) {
     console.error(`Lỗi khi cập nhật giá thấp nhất cho khách sạn ${hotelId}:`, error);
     throw error;

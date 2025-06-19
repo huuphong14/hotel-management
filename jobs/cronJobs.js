@@ -21,7 +21,7 @@ const retryOperation = async (operation, maxRetries = 3, delay = 1000) => {
 
 // Cập nhật giá thấp nhất cho tất cả khách sạn mỗi ngày vào lúc 1 giờ sáng
 exports.scheduleUpdateLowestPrices = () => {
-  cron.schedule('0 1 * * *', async () => {
+  cron.schedule('*/5 * * * *', async () => {
     try {
       console.log('Đang chạy job cập nhật giá thấp nhất cho tất cả khách sạn...');
       

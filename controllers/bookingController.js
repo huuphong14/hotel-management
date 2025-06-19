@@ -10,6 +10,7 @@ const Payment = require("../models/Payment");
 const mongoose = require("mongoose");
 const { validateVoucher } = require("../services/voucherService");
 const { recordRetryFailure } = require("../utils/monitoring");
+const { updateHotelLowestPrice } = require("../utils/hotelHelpers");
 
 /**
  * @swagger
@@ -232,7 +233,7 @@ exports.createBooking = async (req, res) => {
     const numberOfDays = Math.ceil(
       (checkOutDate - checkInDate) / (1000 * 60 * 60 * 24)
     );
-    
+
     // Tính toán giá phòng
     const roomOriginalPrice = room.price * numberOfDays; // Giá gốc không giảm
     const roomDiscountAmount = roomPriceInfo.discountAmountPerNight * numberOfDays; // Tổng tiền giảm giá phòng
@@ -260,7 +261,7 @@ exports.createBooking = async (req, res) => {
       checkInDate,
       user.tier
     );
-    
+
     if (!voucherValidation.success) {
       await session.abortTransaction();
       session.endSession();
@@ -478,7 +479,8 @@ exports.createBooking = async (req, res) => {
     } else {
       paymentUrl = await ZaloPayService.createPaymentUrl(booking);
     }
-
+    await updateHotelLowestPrice(room.hotelId._id);
+    console.log(`Đã gọi updateHotelLowestPrice cho khách sạn ${room.hotelId._id} sau khi tạo booking`);
     await session.commitTransaction();
     session.endSession();
 
@@ -520,15 +522,15 @@ exports.createBooking = async (req, res) => {
 
 const calculateRoomPrice = (room, checkInDate) => {
   const checkIn = new Date(checkInDate);
-  
+
   // Kiểm tra xem phòng có đang trong thời gian giảm giá không
-  if (room.discountPercent > 0 && 
-      room.discountStartDate && 
-      room.discountEndDate) {
-    
+  if (room.discountPercent > 0 &&
+    room.discountStartDate &&
+    room.discountEndDate) {
+
     const discountStart = new Date(room.discountStartDate);
     const discountEnd = new Date(room.discountEndDate);
-    
+
     // Kiểm tra xem ngày check-in có nằm trong thời gian giảm giá không
     if (checkIn >= discountStart && checkIn <= discountEnd) {
       const discountAmount = (room.price * room.discountPercent) / 100;
@@ -540,7 +542,7 @@ const calculateRoomPrice = (room, checkInDate) => {
       };
     }
   }
-  
+
   return {
     pricePerNight: room.price,
     isDiscounted: false,
@@ -1248,6 +1250,9 @@ exports.cancelBooking = async (req, res) => {
       console.log(
         `Đã cập nhật booking ${booking._id} thành trạng thái 'cancelled'`
       );
+
+      await updateHotelLowestPrice(booking.room.hotelId);
+      console.log(`Đã gọi updateHotelLowestPrice cho khách sạn ${booking.room.hotelId} sau khi hủy booking`);
 
       // Gửi thông báo hủy
       await NotificationService.createNotification({
@@ -2136,6 +2141,10 @@ exports.cancelExpiredBookings = async () => {
         });
         // Tiếp tục với booking tiếp theo thay vì throw
       }
+    }
+    for (const hotelId of hotelIds) {
+      await updateHotelLowestPrice(hotelId);
+      console.log(`Đã gọi updateHotelLowestPrice cho khách sạn ${hotelId}`);
     }
 
     // Bước 4: Commit transaction
